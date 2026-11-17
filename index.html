@@ -44,6 +44,19 @@
   th, td { border: 1px solid #d9dde5; padding: 4px 7px; white-space: nowrap; text-align: center; }
   td.l, th.l { text-align: left; }
   tr.kop td { background: #eef0f4; font-weight: 600; text-align: left; }
+  .status { display: flex; gap: 12px; align-items: center; background: #fff; border: 3px solid #1f7a3f; border-radius: 14px; padding: 10px 12px; }
+  .status .badge { flex: none; width: 46px; height: 46px; border-radius: 50%; color: #fff; font-size: 1.6rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .status b { display: block; font-size: 1.15rem; }
+  .status span.t { display: block; font-size: .85rem; color: #4a5266; margin-top: 2px; }
+  .kies { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .kies .lbl { font-size: .8rem; color: #6b7384; }
+  .kies button { padding: 7px 12px; border-radius: 18px; border: 2px solid; background: #fff; font-weight: 600; font-size: .9rem; }
+  .kies button.aan { color: #fff; }
+  .groot small { display: block; font-size: .8rem; font-weight: 400; opacity: .9; margin-top: 3px; }
+  .wis { width: 100%; padding: 10px; font-size: .9rem; border: 1px solid #b42318; color: #b42318; background: #fff; border-radius: 12px; }
+  .tag { display: inline-block; font-size: .75rem; padding: 2px 8px; border-radius: 10px; margin-left: 6px; vertical-align: 2px; }
+  .tag.bezig { background: #dcf3e4; color: #1f7a3f; }
+  .tag.klaar { background: #eef0f4; color: #5b6478; }
   .verborgen { display: none; }
   .letter { background: #1d2330; color: #fff; border-radius: 50%; width: 22px; height: 22px; line-height: 22px; text-align: center; font-weight: 700; font-size: .75rem; border: 2px solid #fff; }
   .sleuflabel { background: #fff; border: 1px solid #1d2330; border-radius: 6px; padding: 1px 5px; font-weight: 600; font-size: .75rem; }
@@ -110,6 +123,8 @@
   function letter(i) { var s = ''; i++; while (i > 0) { var r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); } return s; }
   function kol(i) { return 'A-' + (i + 1 < 10 ? '0' : '') + (i + 1); }
   function kopie(o) { return JSON.parse(JSON.stringify(o)); }
+  var KL = ['#1f7a3f', '#1a73e8', '#c2410c', '#7e22ce', '#0e7490', '#b45309'];
+  function kl(i) { return KL[i % KL.length]; }
   function actief() { return S.punten.length === S.sleuven.length; }   // laatste sleuf loopt nog (heeft nog geen eindpunt)
   function typesVan(p) { var basis = PARTIJEN.filter(function (x) { return x.naam === p; })[0].types; return basis.concat(S.eigen[p] || []); }
   function nieuweSleuf(vorige) {
@@ -129,7 +144,7 @@
     referrerPolicy: 'strict-origin-when-cross-origin'
   }).addTo(kaart);
   var laag = L.layerGroup().addTo(kaart);
-  var mijn = null, nauwk = null, laatstePos = null;
+  var mijn = null, nauwk = null, laatstePos = null, liveLijn = null;
 
   function tekenKaart(passen) {
     laag.clearLayers();
@@ -149,6 +164,10 @@
         lijn.addTo(laag);
       }
     });
+    liveLijn = null;
+    if (S.sleuven.length && actief() && laatstePos) {
+      liveLijn = L.polyline([S.punten[S.punten.length - 1], [laatstePos.lat, laatstePos.lng]], { color: kl(S.sleuven.length - 1), weight: 5, dashArray: '8 8', opacity: .9 }).addTo(laag);
+    }
     if (passen && alle.length) kaart.fitBounds(L.latLngBounds(alle), { maxZoom: 19, padding: [30, 30] });
   }
 
@@ -158,6 +177,8 @@
     $('gps').textContent = 'GPS: nauwkeurigheid ongeveer ' + Math.round(laatstePos.nauw) + ' m';
     if (!mijn) { mijn = L.circleMarker([laatstePos.lat, laatstePos.lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#1a73e8', fillOpacity: 1 }).addTo(kaart); nauwk = L.circle([laatstePos.lat, laatstePos.lng], { radius: laatstePos.nauw, color: '#1a73e8', weight: 1, fillOpacity: .1 }).addTo(kaart); if (!S.punten.length) kaart.setView([laatstePos.lat, laatstePos.lng], 18); }
     else { mijn.setLatLng([laatstePos.lat, laatstePos.lng]); nauwk.setLatLng([laatstePos.lat, laatstePos.lng]); nauwk.setRadius(laatstePos.nauw); }
+    if (liveLijn && S.punten.length) liveLijn.setLatLngs([S.punten[S.punten.length - 1], [laatstePos.lat, laatstePos.lng]]);
+    else if (S.sleuven.length && actief() && !liveLijn) tekenKaart(false);
   }
   if ('geolocation' in navigator) {
     navigator.geolocation.watchPosition(zetPos, function (e) { $('gps').textContent = 'GPS niet beschikbaar: ' + (e.message || e.code); }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 30000 });
@@ -215,17 +236,30 @@
   }
 
   function renderActies() {
-    var h = '';
-    if (!S.sleuven.length) {
-      h = '<button class="groot" id="bStart" type="button">Start sleuf 1 (punt A)</button>';
-    } else if (actief()) {
-      var n = S.sleuven.length;
-      h = '<button class="groot" id="bVolgende" type="button">Einde sleuf ' + n + ', start sleuf ' + (n + 1) + '</button>' +
-          '<button class="groot grijs" id="bLaatste" type="button">Einde sleuf ' + n + ' (laatste sleuf)</button>';
+    var h = '', n = S.sleuven.length;
+    if (!n) {
+      h = '<div class="status" style="border-color:#8a93a6"><div><b>Nog niet begonnen</b><span class="t">Ga op het beginpunt van de eerste sleuf staan en tik hieronder.</span></div></div>' +
+          '<button class="groot" id="bStart" type="button">Start sleuf 1 hier<small>dit wordt punt A</small></button>';
     } else {
-      h = '<button class="groot" id="bNieuw" type="button">Nog een sleuf toevoegen (start op het laatste punt)</button>';
+      var act = actief(), k = kl(n - 1);
+      h = '<div class="status" style="border-color:' + k + '"><span class="badge" style="background:' + k + '">' + n + '</span><div>' +
+          (act ? '<b>Je meet nu: sleuf ' + n + '</b><span class="t">Gestart in punt ' + letter(n - 1) + '. Loop tot het einde van deze sleuf en tik dan hieronder.</span>'
+               : '<b>Sleuf ' + n + ' is afgesloten</b><span class="t">Je kan nog een sleuf toevoegen. Ben je klaar, dan hoef je niets meer te doen.</span>') +
+          '</div></div>';
+      if (n > 1) {
+        h += '<div class="kies"><span class="lbl">Gegevens invullen van:</span>' + S.sleuven.map(function (x, i) {
+          var c = kl(i), aan = i === S.sel;
+          return '<button type="button" data-sel="' + i + '" class="' + (aan ? 'aan' : '') + '" style="border-color:' + c + ';' + (aan ? 'background:' + c : 'color:' + c) + '">Sleuf ' + (i + 1) + (act && i === n - 1 ? ' ●' : '') + '</button>';
+        }).join('') + '</div>';
+      }
+      if (act) {
+        h += '<button class="groot" id="bVolgende" type="button">Sleuf ' + n + ' stopt hier, en ik begin sleuf ' + (n + 1) + '<small>het eindpunt van sleuf ' + n + ' is ook het startpunt van sleuf ' + (n + 1) + '</small></button>' +
+             '<button class="groot grijs" id="bLaatste" type="button">Sleuf ' + n + ' stopt hier, en dit was de laatste<small>ik ben klaar met opmeten</small></button>';
+      } else {
+        h += '<button class="groot" id="bNieuw" type="button">Nog een sleuf toevoegen<small>start op het laatste punt (' + letter(n) + ')</small></button>';
+      }
+      h += '<button class="wis" id="bVerwijder" type="button">Sleuf ' + n + ' wissen (de laatste)</button>';
     }
-    if (S.sleuven.length) h += '<button class="groot rood" id="bVerwijder" type="button" style="padding:10px;font-size:.9rem">Laatste sleuf verwijderen</button>';
     $('acties').innerHTML = h;
     var b;
     if ((b = $('bStart'))) b.onclick = startSleuf;
@@ -234,6 +268,10 @@
     if ((b = $('bLaatste'))) b.onclick = eindeLaatste;
     if ((b = $('bVerwijder'))) b.onclick = verwijderLaatste;
   }
+  $('acties').addEventListener('click', function (e) {
+    var el = e.target.closest('button[data-sel]'); if (!el) return;
+    S.sel = +el.dataset.sel; bewaar(); renderAlles();
+  });
 
   // ---------- Formulier voor de gekozen sleuf ----------
   function renderFormulier() {
@@ -242,7 +280,8 @@
     var i = S.sel, s = S.sleuven[i], h = '';
     var heeftVorige = i > 0;
     var vorigeKnop = function (wat) { return heeftVorige ? '<button class="vorige" type="button" data-vorige="' + wat + '">Zoals vorige</button>' : ''; };
-    h += '<div class="blok"><h3>Sleuf ' + (i + 1) + ' <span class="klein">(' + letter(i) + (S.punten.length > i + 1 ? ' tot ' + letter(i + 1) : ' loopt nog') + ')</span></h3>';
+    var bezig = actief() && i === S.sleuven.length - 1;
+    h += '<div class="blok" style="border:3px solid ' + kl(i) + '"><h3 style="font-size:1.2rem"><span style="display:inline-block;background:' + kl(i) + ';color:#fff;border-radius:50%;width:30px;height:30px;line-height:30px;text-align:center;margin-right:8px">' + (i + 1) + '</span>Sleuf ' + (i + 1) + ' <span class="klein">(' + letter(i) + (S.punten.length > i + 1 ? ' tot ' + letter(i + 1) : ' loopt nog') + ')</span>' + (bezig ? '<span class="tag bezig">bezig</span>' : '<span class="tag klaar">afgesloten</span>') + '</h3>';
     h += '<label class="veld">Meters (van het meetwiel)</label><input class="tekst meters" id="fMeters" type="number" inputmode="decimal" step="0.1" min="0" value="' + esc(s.meters) + '" placeholder="0,0">';
     h += '<label class="veld">Zijde van de straat</label><div class="chips">' + ZIJDEN.map(function (z) { return '<button type="button" class="chip' + (s.zijde === z ? ' aan' : '') + '" data-zijde="' + z + '">' + z + '</button>'; }).join('') + '</div></div>';
 
