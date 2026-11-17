@@ -3,48 +3,380 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Opmeten - GPS-test</title>
+<title>Opmeten sleuven</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-  body { font-family: system-ui, sans-serif; margin: 0; padding: 24px 16px; background: #f5f6f8; color: #1d2330; }
-  h1 { font-size: 1.3rem; margin: 0 0 6px; }
-  p { margin: 6px 0 16px; color: #4a5263; }
-  button { width: 100%; padding: 18px; font-size: 1.1rem; border: 0; border-radius: 12px; background: #1f7a3f; color: #fff; }
-  #uitslag { margin-top: 20px; padding: 16px; border-radius: 12px; background: #fff; border: 1px solid #d9dde5; line-height: 1.6; }
-  .ok { color: #1f7a3f; font-weight: 600; }
-  .fout { color: #b42318; font-weight: 600; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: #f5f6f8; color: #1d2330; font-size: 16px; }
+  header { position: sticky; top: 0; z-index: 1000; background: #fff; border-bottom: 1px solid #d9dde5; padding: 8px 10px; }
+  header .rij { display: flex; gap: 8px; align-items: center; }
+  header input { flex: 1; padding: 8px; border: 1px solid #c8ced9; border-radius: 8px; font-size: 1rem; min-width: 0; }
+  .tabs { display: flex; gap: 6px; margin-top: 8px; }
+  .tabs button { flex: 1; padding: 9px; border: 1px solid #c8ced9; background: #fff; border-radius: 8px; font-size: .95rem; }
+  .tabs button.aan { background: #1f7a3f; border-color: #1f7a3f; color: #fff; }
+  #map { height: 40vh; min-height: 260px; }
+  #gps { font-size: .8rem; color: #6b7384; padding: 4px 10px; }
+  .blok { background: #fff; border: 1px solid #d9dde5; border-radius: 12px; margin: 10px; padding: 12px; }
+  .blok h3 { margin: 0 0 8px; font-size: 1rem; }
+  .knoppen { display: flex; flex-direction: column; gap: 8px; margin: 10px; }
+  .groot { width: 100%; padding: 16px; font-size: 1.05rem; border: 0; border-radius: 12px; background: #1f7a3f; color: #fff; }
+  .groot.grijs { background: #5b6478; }
+  .groot.rood { background: #b42318; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { padding: 9px 12px; border: 1px solid #c8ced9; border-radius: 20px; background: #fff; font-size: .95rem; }
+  .chip.aan { background: #1f7a3f; border-color: #1f7a3f; color: #fff; }
   .klein { font-size: .85rem; color: #6b7384; }
+  .vorige { float: right; padding: 5px 10px; font-size: .8rem; border: 1px solid #c8ced9; border-radius: 14px; background: #f5f6f8; }
+  label.veld { display: block; margin: 6px 0 4px; font-weight: 600; font-size: .9rem; }
+  input.tekst, textarea { width: 100%; padding: 10px; border: 1px solid #c8ced9; border-radius: 8px; font-size: 1rem; }
+  .meters { font-size: 1.4rem; padding: 12px; text-align: center; }
+  .stap { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid #eef0f4; }
+  .stap .naam { flex: 1; }
+  .stap button { width: 38px; height: 38px; border: 1px solid #c8ced9; border-radius: 50%; background: #fff; font-size: 1.2rem; }
+  .stap .n { min-width: 24px; text-align: center; font-weight: 600; }
+  .plus { display: flex; gap: 6px; margin-top: 6px; }
+  .plus input { flex: 1; padding: 8px; border: 1px solid #c8ced9; border-radius: 8px; font-size: .95rem; min-width: 0; }
+  .plus button { padding: 8px 12px; border: 1px solid #c8ced9; border-radius: 8px; background: #fff; }
+  .kaart-sleuf { border-top: 1px solid #eef0f4; padding: 8px 0; }
+  .kaart-sleuf:first-child { border-top: 0; }
+  .tabelwrap { overflow-x: auto; }
+  table { border-collapse: collapse; font-size: .8rem; }
+  th, td { border: 1px solid #d9dde5; padding: 4px 7px; white-space: nowrap; text-align: center; }
+  td.l, th.l { text-align: left; }
+  tr.kop td { background: #eef0f4; font-weight: 600; text-align: left; }
+  .verborgen { display: none; }
+  .letter { background: #1d2330; color: #fff; border-radius: 50%; width: 22px; height: 22px; line-height: 22px; text-align: center; font-weight: 700; font-size: .75rem; border: 2px solid #fff; }
+  .sleuflabel { background: #fff; border: 1px solid #1d2330; border-radius: 6px; padding: 1px 5px; font-weight: 600; font-size: .75rem; }
 </style>
 </head>
 <body>
-<h1>GPS-test voor het opmeten</h1>
-<p>Tik op de knop en keur de locatie goed als je telefoon erom vraagt.</p>
-<button id="knop" type="button">Test GPS</button>
-<div id="uitslag" class="klein">Nog niet getest.</div>
+<header>
+  <div class="rij">
+    <input id="werf" type="text" placeholder="Werf (naam of nummer)">
+  </div>
+  <div class="tabs">
+    <button id="tabOpmeten" class="aan" type="button">Opmeten</button>
+    <button id="tabOverzicht" type="button">Overzicht</button>
+  </div>
+</header>
+
+<section id="vOpmeten">
+  <div id="map"></div>
+  <div id="gps">GPS: nog geen positie</div>
+  <div class="knoppen" id="acties"></div>
+  <div id="formulier"></div>
+</section>
+
+<section id="vOverzicht" class="verborgen">
+  <div class="blok"><h3>Sleuven</h3><div id="lijst"></div></div>
+  <div class="blok">
+    <h3>Opnameblad-weergave</h3>
+    <p class="klein">Zo komen de gegevens op het opnameblad terecht: elke sleuf is een kolom (A-01, A-02, ...). In de cel staan de meters.</p>
+    <div class="tabelwrap" id="tabel"></div>
+  </div>
+  <div class="knoppen">
+    <button id="kopieer" class="groot grijs" type="button">Kopieer als tekst</button>
+    <button id="csv" class="groot grijs" type="button">Download als CSV</button>
+    <button id="wis" class="groot rood" type="button">Alles wissen</button>
+  </div>
+  <div id="melding" class="klein" style="margin:0 12px 24px"></div>
+</section>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
-  var knop = document.getElementById('knop');
-  var uit = document.getElementById('uitslag');
-  knop.addEventListener('click', function () {
-    if (!('geolocation' in navigator)) {
-      uit.innerHTML = '<span class="fout">Geen GPS-ondersteuning in deze browser.</span>';
-      return;
+  'use strict';
+
+  // ---------- Vaste lijsten (uit het opnameblad) ----------
+  var BOVENBOUW = ['Berm', 'Losse bestrating', 'Bitumen / cementbeton'];
+  var KLEUR = { 'Berm': '#2e8b57', 'Losse bestrating': '#e08a00', 'Bitumen / cementbeton': '#35507a', '': '#888' };
+  var BIJZ = ['Meerdiepte', 'Stutten', 'Boordsteen uitbreken en plaatsen', 'Kabels opbinden of verplaatsen', 'Bronbemaling', 'Boring', 'Doorsteek', 'Vachtbuizen'];
+  var PARTIJEN = [
+    { naam: 'Fluvius', types: ['MS-PRC', 'LS 4G150', 'LS 4G240', 'OV 4G10'] },
+    { naam: 'Gas', types: ['Gas'] },
+    { naam: 'Drinkwater', types: ['100 - 200p', 'HDPE', 'SRV'] },
+    { naam: 'Telecom en overige', types: ['Coax 20 mm', 'Coax 14 mm', 'Wachtbuis', 'DB 7'] }
+  ];
+  var ZIJDEN = ['Links', 'Midden', 'Rechts'];
+  var SLEUTEL = 'opmeten.v1';
+
+  // ---------- Toestand ----------
+  var S = { werf: '', punten: [], sleuven: [], eigen: {}, sel: -1 };
+  try { var opgeslagen = JSON.parse(localStorage.getItem(SLEUTEL)); if (opgeslagen && opgeslagen.sleuven) S = opgeslagen; } catch (e) {}
+  function bewaar() { try { localStorage.setItem(SLEUTEL, JSON.stringify(S)); } catch (e) {} }
+
+  function $(id) { return document.getElementById(id); }
+  function esc(t) { return String(t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function letter(i) { var s = ''; i++; while (i > 0) { var r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); } return s; }
+  function kol(i) { return 'A-' + (i + 1 < 10 ? '0' : '') + (i + 1); }
+  function kopie(o) { return JSON.parse(JSON.stringify(o)); }
+  function actief() { return S.punten.length === S.sleuven.length; }   // laatste sleuf loopt nog (heeft nog geen eindpunt)
+  function typesVan(p) { var basis = PARTIJEN.filter(function (x) { return x.naam === p; })[0].types; return basis.concat(S.eigen[p] || []); }
+  function nieuweSleuf(vorige) {
+    return {
+      meters: '', zijde: vorige ? vorige.zijde : 'Rechts',
+      bovenbouw: vorige ? vorige.bovenbouw : '',
+      leidingen: vorige ? kopie(vorige.leidingen) : {},
+      bijz: vorige ? vorige.bijz.slice() : [], opm: ''
+    };
+  }
+
+  // ---------- Kaart ----------
+  var kaart = L.map('map', { zoomControl: true }).setView([51.158, 4.445], 16);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    referrerPolicy: 'strict-origin-when-cross-origin'
+  }).addTo(kaart);
+  var laag = L.layerGroup().addTo(kaart);
+  var mijn = null, nauwk = null, laatstePos = null;
+
+  function tekenKaart(passen) {
+    laag.clearLayers();
+    var alle = [];
+    S.punten.forEach(function (p, i) {
+      var m = L.marker(p, { draggable: true, icon: L.divIcon({ className: '', html: '<div class="letter">' + letter(i) + '</div>', iconSize: [22, 22], iconAnchor: [11, 11] }) });
+      m.on('dragend', function () { var ll = m.getLatLng(); S.punten[i] = [ll.lat, ll.lng]; bewaar(); tekenKaart(false); });
+      m.addTo(laag);
+      alle.push(p);
+    });
+    S.sleuven.forEach(function (s, i) {
+      if (S.punten.length > i + 1) {
+        var a = S.punten[i], b = S.punten[i + 1];
+        var lijn = L.polyline([a, b], { color: KLEUR[s.bovenbouw] || KLEUR[''], weight: i === S.sel ? 8 : 5, opacity: .9 });
+        lijn.on('click', function () { S.sel = i; bewaar(); renderAlles(); });
+        lijn.bindTooltip('Sleuf ' + (i + 1) + (s.meters ? ' (' + s.meters + ' m)' : ''), { permanent: true, direction: 'center', className: 'sleuflabel' });
+        lijn.addTo(laag);
+      }
+    });
+    if (passen && alle.length) kaart.fitBounds(L.latLngBounds(alle), { maxZoom: 19, padding: [30, 30] });
+  }
+
+  // ---------- GPS ----------
+  function zetPos(p) {
+    laatstePos = { lat: p.coords.latitude, lng: p.coords.longitude, nauw: p.coords.accuracy, t: Date.now() };
+    $('gps').textContent = 'GPS: nauwkeurigheid ongeveer ' + Math.round(laatstePos.nauw) + ' m';
+    if (!mijn) { mijn = L.circleMarker([laatstePos.lat, laatstePos.lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#1a73e8', fillOpacity: 1 }).addTo(kaart); nauwk = L.circle([laatstePos.lat, laatstePos.lng], { radius: laatstePos.nauw, color: '#1a73e8', weight: 1, fillOpacity: .1 }).addTo(kaart); if (!S.punten.length) kaart.setView([laatstePos.lat, laatstePos.lng], 18); }
+    else { mijn.setLatLng([laatstePos.lat, laatstePos.lng]); nauwk.setLatLng([laatstePos.lat, laatstePos.lng]); nauwk.setRadius(laatstePos.nauw); }
+  }
+  if ('geolocation' in navigator) {
+    navigator.geolocation.watchPosition(zetPos, function (e) { $('gps').textContent = 'GPS niet beschikbaar: ' + (e.message || e.code); }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 30000 });
+  } else { $('gps').textContent = 'Geen GPS-ondersteuning in deze browser.'; }
+
+  function haalPunt(klaar) {
+    function klaarMetLaatste() {
+      if (laatstePos && Date.now() - laatstePos.t < 20000) { klaar([laatstePos.lat, laatstePos.lng]); return true; }
+      return false;
     }
-    uit.textContent = 'Locatie opvragen... (buiten gaat het sneller)';
-    var start = Date.now();
-    navigator.geolocation.getCurrentPosition(function (p) {
-      var c = p.coords;
-      uit.innerHTML =
-        '<span class="ok">GPS werkt.</span><br>' +
-        'Breedtegraad: ' + c.latitude.toFixed(6) + '<br>' +
-        'Lengtegraad: ' + c.longitude.toFixed(6) + '<br>' +
-        'Nauwkeurigheid: ongeveer ' + Math.round(c.accuracy) + ' m<br>' +
-        'Duur: ' + Math.round((Date.now() - start) / 100) / 10 + ' s<br>' +
-        '<span class="klein">Pagina op het hoogste niveau: ' + (window.top === window.self ? 'ja' : 'nee') + '</span>';
-    }, function (e) {
-      var tekst = { 1: 'Toestemming geweigerd.', 2: 'Positie niet beschikbaar.', 3: 'Te lang gewacht (time-out).' }[e.code] || 'Onbekende fout.';
-      uit.innerHTML = '<span class="fout">GPS werkt niet: ' + tekst + '</span><br><span class="klein">' + (e.message || '') + '</span>';
-    }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+    if (klaarMetLaatste()) return;
+    if (!('geolocation' in navigator)) return val();
+    navigator.geolocation.getCurrentPosition(function (p) { zetPos(p); klaar([p.coords.latitude, p.coords.longitude]); }, function () { if (!klaarMetLaatste()) val(); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    function val() {
+      if (confirm('GPS lukt niet. Het punt op het midden van de kaart zetten? Je kan het daarna met je vinger verslepen.')) { var c = kaart.getCenter(); klaar([c.lat, c.lng]); }
+    }
+  }
+
+  // ---------- Acties ----------
+  function startSleuf() {
+    haalPunt(function (pt) {
+      var vorige = S.sleuven.length ? S.sleuven[S.sleuven.length - 1] : null;
+      S.punten.push(pt);
+      S.sleuven.push(nieuweSleuf(vorige));
+      S.sel = S.sleuven.length - 1;
+      bewaar(); renderAlles(); kaart.setView(pt, Math.max(kaart.getZoom(), 18));
+    });
+  }
+  function eindeEnVolgende() {
+    haalPunt(function (pt) {
+      S.punten.push(pt);
+      var vorige = S.sleuven[S.sleuven.length - 1];
+      S.sleuven.push(nieuweSleuf(vorige));
+      S.sel = S.sleuven.length - 1;
+      bewaar(); renderAlles();
+    });
+  }
+  function nieuweNaEinde() {
+    var vorige = S.sleuven[S.sleuven.length - 1];
+    S.sleuven.push(nieuweSleuf(vorige));
+    S.sel = S.sleuven.length - 1;
+    bewaar(); renderAlles();
+  }
+  function eindeLaatste() {
+    haalPunt(function (pt) { S.punten.push(pt); S.sel = S.sleuven.length - 1; bewaar(); renderAlles(); });
+  }
+  function verwijderLaatste() {
+    if (!S.sleuven.length) return;
+    if (!confirm('Laatste sleuf verwijderen?')) return;
+    var n = S.sleuven.length, m = S.punten.length;
+    S.sleuven.pop();
+    if (m === n + 1 || n === 1) S.punten.pop();   // beëindigde sleuf: ook het eindpunt weg; enige sleuf: ook het startpunt weg
+    S.sel = S.sleuven.length - 1;
+    bewaar(); renderAlles();
+  }
+
+  function renderActies() {
+    var h = '';
+    if (!S.sleuven.length) {
+      h = '<button class="groot" id="bStart" type="button">Start sleuf 1 (punt A)</button>';
+    } else if (actief()) {
+      var n = S.sleuven.length;
+      h = '<button class="groot" id="bVolgende" type="button">Einde sleuf ' + n + ', start sleuf ' + (n + 1) + '</button>' +
+          '<button class="groot grijs" id="bLaatste" type="button">Einde sleuf ' + n + ' (laatste sleuf)</button>';
+    } else {
+      h = '<button class="groot" id="bNieuw" type="button">Nog een sleuf toevoegen (start op het laatste punt)</button>';
+    }
+    if (S.sleuven.length) h += '<button class="groot rood" id="bVerwijder" type="button" style="padding:10px;font-size:.9rem">Laatste sleuf verwijderen</button>';
+    $('acties').innerHTML = h;
+    var b;
+    if ((b = $('bStart'))) b.onclick = startSleuf;
+    if ((b = $('bNieuw'))) b.onclick = nieuweNaEinde;
+    if ((b = $('bVolgende'))) b.onclick = eindeEnVolgende;
+    if ((b = $('bLaatste'))) b.onclick = eindeLaatste;
+    if ((b = $('bVerwijder'))) b.onclick = verwijderLaatste;
+  }
+
+  // ---------- Formulier voor de gekozen sleuf ----------
+  function renderFormulier() {
+    var f = $('formulier');
+    if (S.sel < 0 || !S.sleuven[S.sel]) { f.innerHTML = '<div class="blok klein">Tik op "Start sleuf 1" om te beginnen. De GPS-positie wordt het eerste punt (A).</div>'; return; }
+    var i = S.sel, s = S.sleuven[i], h = '';
+    var heeftVorige = i > 0;
+    var vorigeKnop = function (wat) { return heeftVorige ? '<button class="vorige" type="button" data-vorige="' + wat + '">Zoals vorige</button>' : ''; };
+    h += '<div class="blok"><h3>Sleuf ' + (i + 1) + ' <span class="klein">(' + letter(i) + (S.punten.length > i + 1 ? ' tot ' + letter(i + 1) : ' loopt nog') + ')</span></h3>';
+    h += '<label class="veld">Meters (van het meetwiel)</label><input class="tekst meters" id="fMeters" type="number" inputmode="decimal" step="0.1" min="0" value="' + esc(s.meters) + '" placeholder="0,0">';
+    h += '<label class="veld">Zijde van de straat</label><div class="chips">' + ZIJDEN.map(function (z) { return '<button type="button" class="chip' + (s.zijde === z ? ' aan' : '') + '" data-zijde="' + z + '">' + z + '</button>'; }).join('') + '</div></div>';
+
+    h += '<div class="blok">' + vorigeKnop('bovenbouw') + '<h3>Bovenbouw</h3><div class="chips">' + BOVENBOUW.map(function (b) { return '<button type="button" class="chip' + (s.bovenbouw === b ? ' aan' : '') + '" data-bovenbouw="' + esc(b) + '">' + esc(b) + '</button>'; }).join('') + '</div></div>';
+
+    h += '<div class="blok">' + vorigeKnop('leidingen') + '<h3>Leidingen en kabels</h3>';
+    PARTIJEN.forEach(function (p) {
+      h += '<label class="veld">' + esc(p.naam) + '</label><div class="chips">';
+      typesVan(p.naam).forEach(function (t) {
+        var k = p.naam + '|' + t;
+        h += '<button type="button" class="chip' + (s.leidingen[k] ? ' aan' : '') + '" data-leiding="' + esc(k) + '">' + esc(t) + '</button>';
+      });
+      h += '</div><div class="plus"><input type="text" placeholder="Ander type bij ' + esc(p.naam) + '" data-nieuwtype="' + esc(p.naam) + '"><button type="button" data-voegtoe="' + esc(p.naam) + '">+</button></div>';
+    });
+    var gekozen = Object.keys(s.leidingen);
+    if (gekozen.length) {
+      h += '<label class="veld" style="margin-top:12px">Aantal per gekozen leiding</label>';
+      gekozen.forEach(function (k) {
+        h += '<div class="stap"><span class="naam">' + esc(k.replace('|', ': ')) + '</span><button type="button" data-min="' + esc(k) + '">&minus;</button><span class="n">' + s.leidingen[k] + '</span><button type="button" data-plus="' + esc(k) + '">+</button></div>';
+      });
+    }
+    h += '</div>';
+
+    h += '<div class="blok">' + vorigeKnop('bijz') + '<h3>Bijzonderheden</h3><div class="chips">' + BIJZ.map(function (b) { return '<button type="button" class="chip' + (s.bijz.indexOf(b) >= 0 ? ' aan' : '') + '" data-bijz="' + esc(b) + '">' + esc(b) + '</button>'; }).join('') + '</div>';
+    h += '<label class="veld">Opmerking</label><textarea id="fOpm" rows="2">' + esc(s.opm) + '</textarea></div>';
+    f.innerHTML = h;
+  }
+
+  $('formulier').addEventListener('click', function (e) {
+    var el = e.target.closest('button'); if (!el) return;
+    var s = S.sleuven[S.sel]; if (!s) return;
+    var d = el.dataset, vorige = S.sleuven[S.sel - 1];
+    if (d.zijde) s.zijde = d.zijde;
+    else if (d.bovenbouw !== undefined) s.bovenbouw = (s.bovenbouw === d.bovenbouw ? '' : d.bovenbouw);
+    else if (d.leiding) { if (s.leidingen[d.leiding]) delete s.leidingen[d.leiding]; else s.leidingen[d.leiding] = 1; }
+    else if (d.plus) s.leidingen[d.plus] = (s.leidingen[d.plus] || 0) + 1;
+    else if (d.min) { s.leidingen[d.min] = (s.leidingen[d.min] || 1) - 1; if (s.leidingen[d.min] < 1) delete s.leidingen[d.min]; }
+    else if (d.bijz) { var ix = s.bijz.indexOf(d.bijz); if (ix >= 0) s.bijz.splice(ix, 1); else s.bijz.push(d.bijz); }
+    else if (d.voegtoe) {
+      var inp = document.querySelector('input[data-nieuwtype="' + d.voegtoe + '"]'); var t = (inp.value || '').trim(); if (!t) return;
+      S.eigen[d.voegtoe] = S.eigen[d.voegtoe] || []; if (typesVan(d.voegtoe).indexOf(t) < 0) S.eigen[d.voegtoe].push(t);
+      s.leidingen[d.voegtoe + '|' + t] = 1;
+    }
+    else if (d.vorige && vorige) {
+      if (d.vorige === 'bovenbouw') s.bovenbouw = vorige.bovenbouw;
+      if (d.vorige === 'leidingen') s.leidingen = kopie(vorige.leidingen);
+      if (d.vorige === 'bijz') s.bijz = vorige.bijz.slice();
+    } else return;
+    bewaar(); renderFormulier(); tekenKaart(false); renderActies();
   });
+  $('formulier').addEventListener('input', function (e) {
+    var s = S.sleuven[S.sel]; if (!s) return;
+    if (e.target.id === 'fMeters') { s.meters = e.target.value; bewaar(); tekenKaart(false); }
+    if (e.target.id === 'fOpm') { s.opm = e.target.value; bewaar(); }
+  });
+
+  // ---------- Overzicht ----------
+  function samenvat(s, i) {
+    var lei = Object.keys(s.leidingen).map(function (k) { return k.replace('|', ': ') + (s.leidingen[k] > 1 ? ' x' + s.leidingen[k] : ''); });
+    return 'Sleuf ' + (i + 1) + ' (' + letter(i) + (S.punten.length > i + 1 ? '-' + letter(i + 1) : '-') + '): ' + (s.meters || '?') + ' m, ' + s.zijde + ', ' + (s.bovenbouw || 'bovenbouw ?') +
+      (lei.length ? ' | ' + lei.join(', ') : '') + (s.bijz.length ? ' | ' + s.bijz.join(', ') : '') + (s.opm ? ' | ' + s.opm : '');
+  }
+  function rijen() {
+    var r = [];
+    r.push({ kop: 'Bovenbouw' });
+    BOVENBOUW.forEach(function (b) { r.push({ naam: b, tel: function (s) { return s.bovenbouw === b; } }); });
+    r.push({ kop: 'Werken en bijzonderheden' });
+    BIJZ.forEach(function (b) { r.push({ naam: b, tel: function (s) { return s.bijz.indexOf(b) >= 0; } }); });
+    PARTIJEN.forEach(function (p) {
+      r.push({ kop: p.naam });
+      typesVan(p.naam).forEach(function (t) { var k = p.naam + '|' + t; r.push({ naam: t, tel: function (s) { return !!s.leidingen[k]; }, aantal: function (s) { return s.leidingen[k]; } }); });
+    });
+    return r;
+  }
+  function renderOverzicht() {
+    var lijst = $('lijst');
+    if (!S.sleuven.length) { lijst.innerHTML = '<div class="klein">Nog geen sleuven.</div>'; $('tabel').innerHTML = ''; return; }
+    lijst.innerHTML = S.sleuven.map(function (s, i) { return '<div class="kaart-sleuf">' + esc(samenvat(s, i)) + '</div>'; }).join('');
+    var n = S.sleuven.length, kop = '<tr><th class="l">Opnameblad</th>';
+    for (var i = 0; i < n; i++) kop += '<th>' + kol(i) + '</th>';
+    kop += '<th>Totaal</th></tr>';
+    var body = '';
+    rijen().forEach(function (r) {
+      if (r.kop) { body += '<tr class="kop"><td colspan="' + (n + 2) + '">' + esc(r.kop) + '</td></tr>'; return; }
+      var som = 0, cellen = '', gebruikt = false;
+      S.sleuven.forEach(function (s) {
+        if (r.tel(s)) { var m = parseFloat(String(s.meters).replace(',', '.')); gebruikt = true; if (!isNaN(m)) som += m; var a = r.aantal ? r.aantal(s) : 1; cellen += '<td>' + (isNaN(m) ? '?' : m) + (a > 1 ? ' x' + a : '') + '</td>'; }
+        else cellen += '<td></td>';
+      });
+      if (gebruikt) body += '<tr><td class="l">' + esc(r.naam) + '</td>' + cellen + '<td><b>' + Math.round(som * 10) / 10 + '</b></td></tr>';
+    });
+    $('tabel').innerHTML = '<table>' + kop + body + '</table>';
+  }
+  function tekstUitvoer() {
+    return 'Werf: ' + (S.werf || '-') + '\n' + S.sleuven.map(samenvat).join('\n');
+  }
+  $('kopieer').onclick = function () {
+    var t = tekstUitvoer();
+    function ok() { $('melding').textContent = 'Gekopieerd.'; }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, function () { $('melding').textContent = 'Kopiëren lukte niet.'; });
+    else $('melding').textContent = 'Kopiëren wordt niet ondersteund.';
+  };
+  $('csv').onclick = function () {
+    var regels = [['Werf', 'Sleuf', 'Van', 'Tot', 'Meters', 'Zijde', 'Bovenbouw', 'Leidingen', 'Bijzonderheden', 'Opmerking', 'Lat start', 'Lng start', 'Lat einde', 'Lng einde']];
+    S.sleuven.forEach(function (s, i) {
+      var a = S.punten[i] || ['', ''], b = S.punten[i + 1] || ['', ''];
+      var lei = Object.keys(s.leidingen).map(function (k) { return k.replace('|', ': ') + ' x' + s.leidingen[k]; }).join('; ');
+      regels.push([S.werf, kol(i), letter(i), S.punten.length > i + 1 ? letter(i + 1) : '', s.meters, s.zijde, s.bovenbouw, lei, s.bijz.join('; '), s.opm, a[0], a[1], b[0], b[1]]);
+    });
+    var csv = regels.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';'); }).join('\r\n');
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'opmeting_' + (S.werf || 'werf').replace(/[^\w-]+/g, '_') + '.csv'; document.body.appendChild(a); a.click(); a.remove();
+  };
+  $('wis').onclick = function () {
+    if (!confirm('Alle sleuven van deze opmeting wissen? Dit kan niet ongedaan gemaakt worden.')) return;
+    S.punten = []; S.sleuven = []; S.sel = -1; bewaar(); renderAlles();
+  };
+
+  // ---------- Tabs en start ----------
+  function toon(naam) {
+    $('vOpmeten').classList.toggle('verborgen', naam !== 'opmeten');
+    $('vOverzicht').classList.toggle('verborgen', naam !== 'overzicht');
+    $('tabOpmeten').classList.toggle('aan', naam === 'opmeten');
+    $('tabOverzicht').classList.toggle('aan', naam === 'overzicht');
+    if (naam === 'overzicht') renderOverzicht(); else setTimeout(function () { kaart.invalidateSize(); }, 50);
+  }
+  $('tabOpmeten').onclick = function () { toon('opmeten'); };
+  $('tabOverzicht').onclick = function () { toon('overzicht'); };
+  $('werf').value = S.werf || '';
+  $('werf').addEventListener('input', function () { S.werf = this.value; bewaar(); });
+
+  function renderAlles() { renderActies(); renderFormulier(); tekenKaart(false); }
+  renderAlles();
+  if (S.punten.length) tekenKaart(true);
 })();
 </script>
 </body>

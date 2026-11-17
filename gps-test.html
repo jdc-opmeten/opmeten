@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Opmeten - GPS-test</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 24px 16px; background: #f5f6f8; color: #1d2330; }
+  h1 { font-size: 1.3rem; margin: 0 0 6px; }
+  p { margin: 6px 0 16px; color: #4a5263; }
+  button { width: 100%; padding: 18px; font-size: 1.1rem; border: 0; border-radius: 12px; background: #1f7a3f; color: #fff; }
+  #uitslag { margin-top: 20px; padding: 16px; border-radius: 12px; background: #fff; border: 1px solid #d9dde5; line-height: 1.6; }
+  .ok { color: #1f7a3f; font-weight: 600; }
+  .fout { color: #b42318; font-weight: 600; }
+  .klein { font-size: .85rem; color: #6b7384; }
+</style>
+</head>
+<body>
+<h1>GPS-test voor het opmeten</h1>
+<p>Tik op de knop en keur de locatie goed als je telefoon erom vraagt.</p>
+<button id="knop" type="button">Test GPS</button>
+<div id="uitslag" class="klein">Nog niet getest.</div>
+<script>
+(function () {
+  var knop = document.getElementById('knop');
+  var uit = document.getElementById('uitslag');
+  knop.addEventListener('click', function () {
+    if (!('geolocation' in navigator)) {
+      uit.innerHTML = '<span class="fout">Geen GPS-ondersteuning in deze browser.</span>';
+      return;
+    }
+    uit.textContent = 'Locatie opvragen... (buiten gaat het sneller)';
+    var start = Date.now();
+    navigator.geolocation.getCurrentPosition(function (p) {
+      var c = p.coords;
+      uit.innerHTML =
+        '<span class="ok">GPS werkt.</span><br>' +
+        'Breedtegraad: ' + c.latitude.toFixed(6) + '<br>' +
+        'Lengtegraad: ' + c.longitude.toFixed(6) + '<br>' +
+        'Nauwkeurigheid: ongeveer ' + Math.round(c.accuracy) + ' m<br>' +
+        'Duur: ' + Math.round((Date.now() - start) / 100) / 10 + ' s<br>' +
+        '<span class="klein">Pagina op het hoogste niveau: ' + (window.top === window.self ? 'ja' : 'nee') + '</span>';
+    }, function (e) {
+      var tekst = { 1: 'Toestemming geweigerd.', 2: 'Positie niet beschikbaar.', 3: 'Te lang gewacht (time-out).' }[e.code] || 'Onbekende fout.';
+      uit.innerHTML = '<span class="fout">GPS werkt niet: ' + tekst + '</span><br><span class="klein">' + (e.message || '') + '</span>';
+    }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+  });
+})();
+</script>
+</body>
+</html>
