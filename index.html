@@ -3,75 +3,93 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1f6f5c">
 <title>Opmeten</title>
+<meta name="claude:viewport-fit-sides" content="cover">
 <style>
+/* Layout: één kolom voor de gsm, sticky kop, vaste actiebalk onderaan. */
 :root{
-  --bg:#f4f5f2; --card:#fff; --ink:#1c2321; --muted:#66706c; --line:#d9ddd8;
-  --accent:#1f6f5c; --accent-ink:#fff; --warn:#b4472b; --soft:#e8f1ee;
+  --bg:#f3f5f3; --card:#fff; --ink:#1b2320; --muted:#5f6b66; --line:#d6dcd8;
+  --accent:#1f6f5c; --accent-ink:#fff; --warn:#b4472b; --soft:#e5efeb;
 }
 @media (prefers-color-scheme: dark){
-  :root{ --bg:#121614; --card:#1b201e; --ink:#e7ece9; --muted:#9aa5a0; --line:#2d3532;
-    --accent:#4fb596; --accent-ink:#0d1210; --warn:#e98a6e; --soft:#1f2b27; }
+  :root:not([data-theme="light"]){ --bg:#121614; --card:#1b201e; --ink:#e7ece9; --muted:#9aa5a0; --line:#2d3532;
+    --accent:#4fb596; --accent-ink:#0d1210; --warn:#e98a6e; --soft:#1f2b27; color-scheme:dark; }
 }
+:root[data-theme="dark"]{ --bg:#121614; --card:#1b201e; --ink:#e7ece9; --muted:#9aa5a0; --line:#2d3532;
+  --accent:#4fb596; --accent-ink:#0d1210; --warn:#e98a6e; --soft:#1f2b27; color-scheme:dark; }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:90px}
-header{position:sticky;top:0;z-index:5;background:var(--accent);color:var(--accent-ink);padding:12px 16px;display:flex;align-items:center;gap:10px}
-header h1{font-size:18px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-header button{background:transparent;color:inherit;border:1px solid currentColor;border-radius:8px;padding:6px 10px;font:inherit;font-size:14px}
-main{max-width:720px;margin:0 auto;padding:12px 16px}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:calc(90px + env(safe-area-inset-bottom,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--accent)}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--accent);color:var(--accent-ink);
+  padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;align-items:center;gap:10px}
+header h1{font-size:18px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header button{background:transparent;color:inherit;border:1px solid currentColor;border-radius:8px;padding:6px 10px;font:inherit;font-size:14px;cursor:pointer}
+main{max-width:720px;margin:0 auto;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
-.card h2{font-size:15px;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.card h2{font-size:13px;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 label{display:block;font-size:13px;color:var(--muted);margin:8px 0 3px}
 input,select,textarea{width:100%;font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+input:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 textarea{min-height:60px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
-.btn{display:inline-block;border:0;border-radius:10px;padding:12px 14px;font:inherit;font-weight:600;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.grid2>*{min-width:0}
+.btn{display:inline-block;border:0;border-radius:10px;padding:12px 14px;font:inherit;font-weight:600;background:var(--accent);color:var(--accent-ink);cursor:pointer;text-align:center}
 .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
 .btn.danger{background:transparent;color:var(--warn);border:1px solid var(--warn)}
+.btn.danger.solid{background:var(--warn);color:var(--card)}
 .btn.small{padding:7px 10px;font-size:14px}
+.btn:disabled{opacity:.4;cursor:default}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .list-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line);cursor:pointer}
 .list-item:first-child{border-top:0}
+.list-item>div:first-child{min-width:0}
 .list-item .t{font-weight:600}
 .list-item .s{font-size:13px;color:var(--muted)}
+.list-item .r{text-align:right;flex:none;font-variant-numeric:tabular-nums}
 .sleuf{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:var(--bg)}
 .sleuf-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .sleuf-head strong{font-size:16px}
 .fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:0 10px}
-.fields input{background:var(--card)}
+.fields input,.sleuf .opm,.sleuf .nr{background:var(--card)}
 .unit{font-size:11px;color:var(--muted)}
 table{width:100%;border-collapse:collapse;font-size:14px}
 td,th{padding:7px 4px;border-bottom:1px solid var(--line);text-align:left}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
-.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;justify-content:center;z-index:5}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
+  padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;gap:8px;justify-content:center;z-index:5}
 .bar .btn{flex:1;max-width:240px}
 .empty{color:var(--muted);text-align:center;padding:20px 0}
 .hint{font-size:13px;color:var(--muted)}
-.hidden{display:none!important}
-.chk{display:flex;align-items:center;gap:8px;margin:6px 0}
-.chk input{width:auto}
+.status{font-size:12px;color:var(--muted);text-align:center;margin:4px 0 10px}
+.modal{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;
+  padding:16px max(16px,env(safe-area-inset-left,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-right,0px))}
+.modal .box{background:var(--card);color:var(--ink);border-radius:14px;padding:16px;width:100%;max-width:440px}
+.modal .box p{margin:0 0 14px;white-space:pre-line}
+.modal textarea{min-height:200px;font-size:13px;margin-bottom:12px}
+.modal .row .btn{flex:1}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--ink);color:var(--bg);
+  padding:10px 14px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px)}
 </style>
 </head>
 <body>
 <header>
-  <button id="back" class="hidden" aria-label="Terug">‹ Terug</button>
+  <button id="back" hidden aria-label="Terug">‹ Terug</button>
   <h1 id="title">Opmeten</h1>
   <button id="settingsBtn">Posten</button>
 </header>
 
 <main>
-  <!-- LIJST -->
   <section id="vList">
+    <div class="status" id="status">Opmetingen laden…</div>
     <div class="card">
       <h2>Opmetingen</h2>
       <div id="list"></div>
     </div>
-    <p class="hint">Alles wordt bewaard op dit toestel. Exporteer (CSV) om het in je Sheet of mail te zetten.</p>
   </section>
 
-  <!-- DOSSIER -->
-  <section id="vDossier" class="hidden">
+  <section id="vDossier" hidden>
     <div class="card">
       <h2>Werf</h2>
       <div class="grid2">
@@ -104,37 +122,41 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     </div>
   </section>
 
-  <!-- POSTEN -->
-  <section id="vSettings" class="hidden">
+  <section id="vSettings" hidden>
     <div class="card">
       <h2>Posten (kolommen)</h2>
-      <p class="hint">Dit zijn de kolommen van je papieren opmeetformulier. Pas namen en eenheden aan, of voeg posten toe. Wijzigingen gelden voor alle opmetingen.</p>
+      <p class="hint">Dit zijn de kolommen van het papieren opmeetformulier. Pas namen en eenheden aan, of voeg posten toe. Wijzigingen gelden voor alle opmetingen.</p>
       <div id="postList"></div>
       <button class="btn ghost small" id="addPost">+ Post toevoegen</button>
     </div>
     <div class="card">
       <h2>Back-up</h2>
-      <p class="hint">Volledige back-up van alle opmetingen en posten (JSON), bv. om naar een ander toestel over te zetten.</p>
+      <p class="hint">Volledige back-up van alle opmetingen en posten (JSON).</p>
       <div class="row">
         <button class="btn ghost small" id="backupBtn">Back-up downloaden</button>
-        <label class="btn ghost small" style="margin:0">Back-up terugzetten<input type="file" id="restoreFile" accept=".json,application/json" class="hidden"></label>
+        <label class="btn ghost small" style="margin:0">Back-up terugzetten<input type="file" id="restoreFile" accept=".json,application/json" hidden></label>
       </div>
     </div>
   </section>
 </main>
 
 <div class="bar" id="barList"><button class="btn" id="newDossier">+ Nieuwe opmeting</button></div>
-<div class="bar hidden" id="barDossier">
+<div class="bar" id="barDossier" hidden>
   <button class="btn ghost" id="exportCsv">CSV</button>
-  <button class="btn" id="shareBtn">Delen</button>
+  <button class="btn" id="shareBtn">Samenvatting kopiëren</button>
 </div>
+
+<div class="modal" id="modal" hidden><div class="box" role="dialog" aria-modal="true">
+  <p id="modalText"></p>
+  <textarea id="modalArea" hidden readonly></textarea>
+  <div class="row"><button class="btn ghost" id="modalNo">Annuleren</button><button class="btn danger solid" id="modalYes">Verwijderen</button></div>
+</div></div>
+<div class="toast" id="toast" hidden></div>
 
 <script>
 (function(){
 'use strict';
-var KEY='opmeten.v1';
-
-// Standaardposten = kolommen van het papieren opmeetformulier
+var LKEY='opmeten.v1';
 var DEFAULT_POSTEN=[
   {id:'meters',naam:'Meters sleuf',eenheid:'m'},
   {id:'boordstenen',naam:'Boordstenen',eenheid:'m'},
@@ -149,114 +171,211 @@ var DEFAULT_POSTEN=[
   {id:'verv_grond',naam:'Verv. grond',eenheid:'m³'},
   {id:'ean',naam:'EAN',eenheid:'st'}
 ];
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+var state={posten:clone(DEFAULT_POSTEN),dossiers:[]};
+var current=null, view='vList';
 
-var state=load();
-var current=null; // id van open opmeting
-
-function load(){
-  try{
-    var s=JSON.parse(localStorage.getItem(KEY));
-    if(s&&s.posten&&s.dossiers) return s;
-  }catch(e){}
-  return {posten:DEFAULT_POSTEN.slice(),dossiers:[]};
-}
-function save(){ try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){} }
-function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function num(v){ if(v==null||v==='') return 0; var n=parseFloat(String(v).replace(',','.')); return isFinite(n)?n:0; }
 function fmt(n){ return (Math.round(n*100)/100).toLocaleString('nl-BE'); }
-function today(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function pad(n){ return String(n).padStart(2,'0'); }
+function today(){ var d=new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function stamp(){ var d=new Date(); return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes()); }
 function getD(){ return state.dossiers.find(function(d){return d.id===current;}); }
 
-// ---------- views ----------
-function show(view){
-  ['vList','vDossier','vSettings'].forEach(function(v){ $(v).classList.toggle('hidden',v!==view); });
-  $('barList').classList.toggle('hidden',view!=='vList');
-  $('barDossier').classList.toggle('hidden',view!=='vDossier');
-  $('back').classList.toggle('hidden',view==='vList');
-  $('settingsBtn').classList.toggle('hidden',view==='vSettings');
-  if(view==='vList'){ $('title').textContent='Opmeten'; renderList(); }
-  if(view==='vSettings'){ $('title').textContent='Posten'; renderPosten(); }
-  if(view==='vDossier'){ renderDossier(); }
-  window.scrollTo(0,0);
+// ---------- toast & dialogen (geen alert/confirm: werken niet in een gepubliceerde pagina) ----------
+var toastT;
+function toast(msg){ var t=$('toast'); t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(function(){t.hidden=true;},2600); }
+function ask(text,yesLabel){
+  return new Promise(function(res){
+    $('modalText').textContent=text; $('modalArea').hidden=true;
+    $('modalYes').hidden=false; $('modalYes').textContent=yesLabel||'Verwijderen'; $('modalNo').textContent='Annuleren';
+    $('modal').hidden=false;
+    $('modalYes').onclick=function(){ $('modal').hidden=true; res(true); };
+    $('modalNo').onclick=function(){ $('modal').hidden=true; res(false); };
+  });
 }
-var prevView='vList';
-$('back').onclick=function(){ if(!$('vSettings').classList.contains('hidden') && current && getD()) show('vDossier'); else show('vList'); };
+function showText(text,msg){
+  $('modalText').textContent=msg; var a=$('modalArea'); a.hidden=false; a.value=text;
+  $('modalYes').hidden=true; $('modalNo').textContent='Sluiten'; $('modal').hidden=false;
+  $('modalNo').onclick=function(){ $('modal').hidden=true; };
+  a.focus(); a.select();
+}
+
+// ---------- opslag: database van de pagina, anders dit toestel ----------
+var store={
+  mode:'local', db:null,
+  pending:{}, timers:{}, busy:{},
+  loadLocal:function(){
+    try{ var s=JSON.parse(localStorage.getItem(LKEY)); if(s&&s.posten&&s.dossiers){ state=s; } }catch(e){}
+  },
+  saveLocal:function(){ try{ localStorage.setItem(LKEY,JSON.stringify(state)); }catch(e){} },
+  // één schrijfactie tegelijk per document, gebundeld per pauze in het typen
+  queue:function(path,dataFn){
+    var self=this;
+    if(self.mode!=='db'){ self.saveLocal(); return; }
+    self.pending[path]=dataFn;
+    clearTimeout(self.timers[path]);
+    self.timers[path]=setTimeout(function(){ self.flush(path); },600);
+  },
+  flush:function(path){
+    var self=this;
+    if(self.busy[path]||!self.pending[path]) return;
+    var fn=self.pending[path]; delete self.pending[path]; self.busy[path]=true;
+    var data=fn();
+    var p=data===null?self.db.doc(path).delete():self.db.doc(path).set(data);
+    p.catch(function(e){
+      if(e&&e.code==='quota_exceeded') toast('Opslag is vol: verwijder oude opmetingen.');
+      else toast('Opslaan mislukt. Probeer opnieuw.');
+    }).then(function(){ self.busy[path]=false; if(self.pending[path]) self.flush(path); });
+  },
+  isPending:function(path){ return !!(this.pending[path]||this.busy[path]); }
+};
+function saveDossier(d){
+  d.gewijzigd=Date.now();
+  store.queue('dossiers/'+d.id,function(){ return clone(d); });
+}
+function removeDossier(d){
+  state.dossiers=state.dossiers.filter(function(x){return x!==d;});
+  store.queue('dossiers/'+d.id,function(){ return null; });
+}
+function savePosten(){ store.queue('config/posten',function(){ return {posten:clone(state.posten)}; }); }
+
+function setStatus(t){ $('status').textContent=t; }
+
+function initDb(){
+  if(!window.claude||typeof window.claude.use!=='function'){
+    store.loadLocal(); setStatus('Bewaard op dit toestel.'); render(); return;
+  }
+  var loadTimer=setTimeout(function(){ setStatus('De opslag reageert nog niet. Wat je nu ingeeft, wordt bewaard zodra de verbinding er is.'); },10000);
+  window.claude.use('db').then(function(db){
+    if(!db){ clearTimeout(loadTimer); store.loadLocal(); setStatus('Bewaard op dit toestel (online opslag niet beschikbaar).'); render(); return; }
+    store.mode='db'; store.db=db;
+    var gotD=false;
+    db.collection('dossiers').onSnapshot(function(snap){
+      var incoming=snap.docs.map(function(s){ var x=clone(s.data()); x.id=s.id; return x; });
+      var changedCurrent=false;
+      var merged=incoming.map(function(x){
+        var path='dossiers/'+x.id;
+        var local=state.dossiers.find(function(d){return d.id===x.id;});
+        if(local&&store.isPending(path)) return local;
+        if(x.id===current&&local&&JSON.stringify(local)!==JSON.stringify(x)) changedCurrent=true;
+        return x;
+      });
+      // lokaal nieuwe, nog niet bevestigde opmetingen behouden
+      state.dossiers.forEach(function(d){
+        if(store.isPending('dossiers/'+d.id)&&!merged.some(function(x){return x.id===d.id;})) merged.push(d);
+      });
+      state.dossiers=merged;
+      if(!snap.metadata.fromCache){ gotD=true; clearTimeout(loadTimer); setStatus('Opgeslagen online, ook op je andere toestellen.'); }
+      if(view==='vList') renderList();
+      else if(view==='vDossier'){ if(!getD()) show('vList'); else if(changedCurrent&&!isTyping()) renderDossier(); }
+    },function(){ clearTimeout(loadTimer); setStatus('De opslag is niet bereikbaar. Herlaad de pagina later.'); });
+    db.doc('config/posten').onSnapshot(function(s){
+      if(store.isPending('config/posten')) return;
+      if(s.exists&&s.data().posten){ state.posten=clone(s.data().posten); if(view==='vSettings'&&!isTyping()) renderPosten(); else if(view==='vDossier'&&!isTyping()) renderDossier(); }
+    },function(){});
+  });
+}
+function isTyping(){ var a=document.activeElement; return a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'); }
+
+// ---------- views ----------
+function show(v){
+  view=v;
+  ['vList','vDossier','vSettings'].forEach(function(x){ $(x).hidden=(x!==v); });
+  $('barList').hidden=(v!=='vList'); $('barDossier').hidden=(v!=='vDossier');
+  $('back').hidden=(v==='vList'); $('settingsBtn').hidden=(v==='vSettings');
+  render(); window.scrollTo(0,0);
+}
+function render(){
+  if(view==='vList'){ $('title').textContent='Opmeten'; renderList(); }
+  else if(view==='vSettings'){ $('title').textContent='Posten'; renderPosten(); }
+  else renderDossier();
+}
+$('back').onclick=function(){ if(view==='vSettings'&&current&&getD()) show('vDossier'); else { current=null; show('vList'); } };
 $('settingsBtn').onclick=function(){ show('vSettings'); };
 
 // ---------- lijst ----------
 function renderList(){
   var el=$('list');
-  if(!state.dossiers.length){ el.innerHTML='<div class="empty">Nog geen opmetingen.<br>Tik op “+ Nieuwe opmeting”.</div>'; return; }
-  var ds=state.dossiers.slice().sort(function(a,b){return (b.datum||'').localeCompare(a.datum||'')||b.gewijzigd-a.gewijzigd;});
+  if(!state.dossiers.length){ el.innerHTML='<div class="empty">Nog geen opmetingen.<br>Tik op “+ Nieuwe opmeting” om de eerste werf op te meten.</div>'; return; }
+  var ds=state.dossiers.slice().sort(function(a,b){return (b.datum||'').localeCompare(a.datum||'')||(b.gewijzigd||0)-(a.gewijzigd||0);});
   el.innerHTML=ds.map(function(d){
-    var m=d.sleuven.reduce(function(s,x){return s+num(x.v.meters);},0);
-    return '<div class="list-item" data-id="'+d.id+'"><div><div class="t">'+esc(d.straat||'(geen straat)')+'</div>'+
-      '<div class="s">'+esc([d.gemeente,d.dnw,d.datum].filter(Boolean).join(' · '))+'</div></div>'+
-      '<div class="s">'+d.sleuven.length+(d.sleuven.length===1?' sleuf':' sleuven')+'<br>'+fmt(m)+' m</div></div>';
+    var sl=d.sleuven||[];
+    var m=sl.reduce(function(s,x){return s+num(x.v&&x.v.meters);},0);
+    return '<div class="list-item" data-id="'+esc(d.id)+'" tabindex="0"><div><div class="t">'+esc(d.straat||'(geen straat)')+'</div>'+
+      '<div class="s">'+esc([d.gemeente,d.dnw,d.datum&&d.datum.split('-').reverse().join('/')].filter(Boolean).join(' · '))+'</div></div>'+
+      '<div class="s r">'+sl.length+(sl.length===1?' sleuf':' sleuven')+'<br>'+fmt(m)+' m</div></div>';
   }).join('');
   Array.prototype.forEach.call(el.querySelectorAll('.list-item'),function(it){
     it.onclick=function(){ current=it.dataset.id; show('vDossier'); };
+    it.onkeydown=function(e){ if(e.key==='Enter') it.onclick(); };
   });
 }
 $('newDossier').onclick=function(){
   var d={id:uid(),dnw:'',datum:today(),gemeente:'',straat:'',fase:'',aannemer:'',notitie:'',sleuven:[],gewijzigd:Date.now()};
   d.sleuven.push(newSleuf(d));
-  state.dossiers.push(d); save(); current=d.id; show('vDossier');
+  state.dossiers.push(d); saveDossier(d); current=d.id; show('vDossier');
 };
 function newSleuf(d){
   var nr=d.sleuven.reduce(function(m,s){return Math.max(m,parseInt(s.nr,10)||0);},0)+1;
-  return {id:uid(),nr:String(nr),v:{}};
+  return {id:uid(),nr:String(nr),v:{},opm:''};
 }
 
-// ---------- dossier ----------
+// ---------- opmeting ----------
 var HEAD=['dnw','datum','gemeente','straat','fase','aannemer','notitie'];
 function renderDossier(){
   var d=getD(); if(!d){ show('vList'); return; }
+  d.sleuven=d.sleuven||[];
   $('title').textContent=d.straat||'Nieuwe opmeting';
   HEAD.forEach(function(k){
     var inp=$('f_'+k); inp.value=d[k]||'';
-    inp.oninput=function(){ d[k]=inp.value; touch(d); if(k==='straat') $('title').textContent=d.straat||'Nieuwe opmeting'; };
+    inp.oninput=function(){ var dd=getD(); dd[k]=inp.value; saveDossier(dd); if(k==='straat') $('title').textContent=dd.straat||'Nieuwe opmeting'; };
   });
   renderSleuven(); renderTotalen();
 }
-function touch(d){ d.gewijzigd=Date.now(); save(); }
-
 function renderSleuven(){
   var d=getD(), el=$('sleuven');
   if(!d.sleuven.length){ el.innerHTML='<div class="empty">Nog geen sleuven.</div>'; return; }
   el.innerHTML=d.sleuven.map(function(s){
-    return '<div class="sleuf" data-id="'+s.id+'">'+
-      '<div class="sleuf-head"><strong>Sleuf <input class="nr" value="'+esc(s.nr)+'" style="width:70px;display:inline-block;padding:6px" aria-label="Sleufnummer"></strong>'+
+    s.v=s.v||{};
+    return '<div class="sleuf" data-id="'+esc(s.id)+'">'+
+      '<div class="sleuf-head"><strong>Sleuf <input class="nr" id="nr_'+esc(s.id)+'" value="'+esc(s.nr)+'" style="width:70px;display:inline-block;padding:6px" aria-label="Sleufnummer"></strong>'+
       '<button class="btn danger small del">Verwijder</button></div>'+
       '<div class="fields">'+state.posten.map(function(p){
-        return '<div><label>'+esc(p.naam)+' <span class="unit">('+esc(p.eenheid)+')</span></label>'+
-          '<input inputmode="decimal" data-p="'+p.id+'" value="'+esc(s.v[p.id]==null?'':s.v[p.id])+'"></div>';
+        var fid='v_'+s.id+'_'+p.id;
+        return '<div><label for="'+esc(fid)+'">'+esc(p.naam)+' <span class="unit">('+esc(p.eenheid)+')</span></label>'+
+          '<input id="'+esc(fid)+'" inputmode="decimal" data-p="'+esc(p.id)+'" value="'+esc(s.v[p.id]==null?'':s.v[p.id])+'"></div>';
       }).join('')+'</div>'+
-      '<label>Opmerking</label><input class="opm" value="'+esc(s.opm||'')+'"></div>';
+      '<label for="o_'+esc(s.id)+'">Opmerking</label><input class="opm" id="o_'+esc(s.id)+'" value="'+esc(s.opm||'')+'"></div>';
   }).join('');
   Array.prototype.forEach.call(el.querySelectorAll('.sleuf'),function(box){
-    var s=d.sleuven.find(function(x){return x.id===box.dataset.id;});
-    box.querySelector('.nr').oninput=function(e){ s.nr=e.target.value; touch(d); renderTotalen(); };
-    box.querySelector('.opm').oninput=function(e){ s.opm=e.target.value; touch(d); };
+    var sid=box.dataset.id;
+    function S(){ var dd=getD(); return {d:dd,s:dd.sleuven.find(function(x){return x.id===sid;})}; }
+    box.querySelector('.nr').oninput=function(e){ var o=S(); o.s.nr=e.target.value; saveDossier(o.d); renderTotalen(); };
+    box.querySelector('.opm').oninput=function(e){ var o=S(); o.s.opm=e.target.value; saveDossier(o.d); };
     Array.prototype.forEach.call(box.querySelectorAll('input[data-p]'),function(inp){
-      inp.oninput=function(){ var v=inp.value.trim(); if(v==='') delete s.v[inp.dataset.p]; else s.v[inp.dataset.p]=v; touch(d); renderTotalen(); };
+      inp.oninput=function(){ var o=S(); var v=inp.value.trim(); if(v==='') delete o.s.v[inp.dataset.p]; else o.s.v[inp.dataset.p]=v; saveDossier(o.d); renderTotalen(); };
     });
     box.querySelector('.del').onclick=function(){
-      if(!confirm('Sleuf '+s.nr+' verwijderen?')) return;
-      d.sleuven=d.sleuven.filter(function(x){return x!==s;}); touch(d); renderSleuven(); renderTotalen();
+      var o=S();
+      ask('Sleuf '+o.s.nr+' verwijderen?').then(function(ok){
+        if(!ok) return; var dd=getD();
+        dd.sleuven=dd.sleuven.filter(function(x){return x.id!==sid;}); saveDossier(dd); renderSleuven(); renderTotalen();
+      });
     };
   });
 }
 $('addSleuf').onclick=function(){
-  var d=getD(); d.sleuven.push(newSleuf(d)); touch(d); renderSleuven(); renderTotalen();
+  var d=getD(); d.sleuven.push(newSleuf(d)); saveDossier(d); renderSleuven(); renderTotalen();
   var boxes=document.querySelectorAll('.sleuf'); var last=boxes[boxes.length-1];
-  if(last){ last.scrollIntoView({behavior:'smooth',block:'center'}); var f=last.querySelector('input[data-p]'); if(f) f.focus(); }
+  if(last){ last.scrollIntoView({behavior:'smooth',block:'center'}); var f=last.querySelector('input[data-p]'); if(f) f.focus({preventScroll:true}); }
 };
 function totals(d){
   var t={}; state.posten.forEach(function(p){ t[p.id]=0; });
-  d.sleuven.forEach(function(s){ state.posten.forEach(function(p){ t[p.id]+=num(s.v[p.id]); }); });
+  d.sleuven.forEach(function(s){ state.posten.forEach(function(p){ t[p.id]+=num(s.v&&s.v[p.id]); }); });
   return t;
 }
 function renderTotalen(){
@@ -268,38 +387,53 @@ function renderTotalen(){
     }).join('')+'</table>':'<div class="empty">Nog niets ingevuld.</div>';
 }
 $('delDossier').onclick=function(){
-  var d=getD(); if(!confirm('Deze opmeting volledig verwijderen?')) return;
-  state.dossiers=state.dossiers.filter(function(x){return x!==d;}); save(); current=null; show('vList');
+  var d=getD();
+  ask('Deze opmeting ('+(d.straat||'zonder straat')+') volledig verwijderen?').then(function(ok){
+    if(!ok) return; removeDossier(getD()); current=null; show('vList'); toast('Opmeting verwijderd');
+  });
 };
 
 // ---------- export ----------
 function csvCell(v){ v=String(v==null?'':v); return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+function dec(v){ return v==null?'':String(v).replace('.',','); }
 function toCsv(d){
   var head=['DNW','Datum','Gemeente','Straat','Fase','Aannemer','Sleufnr'].concat(state.posten.map(function(p){return p.naam+' ('+p.eenheid+')';})).concat(['Opmerking']);
   var lines=[head];
   d.sleuven.forEach(function(s){
-    lines.push([d.dnw,d.datum,d.gemeente,d.straat,d.fase,d.aannemer,s.nr].concat(state.posten.map(function(p){return s.v[p.id]==null?'':String(s.v[p.id]).replace('.',',');})).concat([s.opm||'']));
+    lines.push([d.dnw,d.datum,d.gemeente,d.straat,d.fase,d.aannemer,s.nr].concat(state.posten.map(function(p){return dec(s.v[p.id]);})).concat([s.opm||'']));
   });
   var t=totals(d);
-  lines.push(['','','','','','','TOTAAL'].concat(state.posten.map(function(p){return t[p.id]?String(Math.round(t[p.id]*100)/100).replace('.',','):'';})).concat(['']));
+  lines.push(['','','','','','','TOTAAL'].concat(state.posten.map(function(p){return t[p.id]?dec(Math.round(t[p.id]*100)/100):'';})).concat(['']));
   return '﻿'+lines.map(function(r){return r.map(csvCell).join(';');}).join('\r\n');
 }
 function fileName(d,ext){
-  var now=new Date(), p=function(n){return String(n).padStart(2,'0');};
-  var stamp=now.getFullYear()+p(now.getMonth()+1)+p(now.getDate())+'_'+p(now.getHours())+p(now.getMinutes());
   var naam=('opmeting '+[d.dnw,d.straat].filter(Boolean).join(' ')).trim().replace(/[^\w\- ]+/g,'').replace(/\s+/g,'-');
-  return stamp+'_'+naam+'.'+ext;
+  return stamp()+'_'+naam+'.'+ext;
 }
-function download(name,text,type){
-  var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:type}));
-  a.download=name; document.body.appendChild(a); a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},500);
+function offerFile(name,text,type){
+  var hasClaude=window.claude&&typeof window.claude.use==='function';
+  if(!hasClaude){
+    var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:type}));
+    a.download=name; document.body.appendChild(a); a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},500);
+    return;
+  }
+  window.claude.use('downloads').then(function(dl){
+    if(!dl){ showText(text,'Downloaden kan hier niet. Kopieer de inhoud hieronder:'); return; }
+    dl.save({filename:name,data:text}).then(function(){ toast('Bestand bewaard'); },function(e){
+      if(e&&e.code==='declined') return;
+      if(e&&e.code==='rate_limited'){ toast('Even geduld en probeer opnieuw.'); return; }
+      showText(text,'Downloaden lukte niet. Kopieer de inhoud hieronder:');
+    });
+  });
 }
-$('exportCsv').onclick=function(){ var d=getD(); download(fileName(d,'csv'),toCsv(d),'text/csv;charset=utf-8'); };
+$('exportCsv').onclick=function(){ var d=getD(); offerFile(fileName(d,'csv'),toCsv(d),'text/csv;charset=utf-8'); };
 function toText(d){
   var t=totals(d), out=[];
   out.push('Opmeting '+[d.straat,d.gemeente].filter(Boolean).join(', '));
-  if(d.dnw) out.push('DNW '+d.dnw); if(d.datum) out.push('Datum '+d.datum.split('-').reverse().join('/'));
-  if(d.fase) out.push('Fase '+d.fase); if(d.aannemer) out.push('Aannemer '+d.aannemer);
+  if(d.dnw) out.push('DNW '+d.dnw);
+  if(d.datum) out.push('Datum '+d.datum.split('-').reverse().join('/'));
+  if(d.fase) out.push('Fase '+d.fase);
+  if(d.aannemer) out.push('Aannemer '+d.aannemer);
   out.push('');
   d.sleuven.forEach(function(s){
     var parts=state.posten.filter(function(p){return s.v[p.id]!=null&&s.v[p.id]!=='';}).map(function(p){return p.naam+' '+s.v[p.id]+' '+p.eenheid;});
@@ -311,16 +445,11 @@ function toText(d){
   return out.join('\n');
 }
 $('shareBtn').onclick=function(){
-  var d=getD(), txt=toText(d);
-  var file=null;
-  try{ file=new File([toCsv(d)],fileName(d,'csv'),{type:'text/csv'}); }catch(e){}
-  if(navigator.share){
-    var data={title:'Opmeting',text:txt};
-    if(file&&navigator.canShare&&navigator.canShare({files:[file]})) data.files=[file];
-    navigator.share(data).catch(function(){});
-  }else if(navigator.clipboard){
-    navigator.clipboard.writeText(txt).then(function(){alert('Samenvatting gekopieerd. Plak ze in je mail.');},function(){prompt('Kopieer de tekst:',txt);});
-  }else{ prompt('Kopieer de tekst:',txt); }
+  var txt=toText(getD());
+  try{
+    navigator.clipboard.writeText(txt).then(function(){ toast('Samenvatting gekopieerd. Plak ze in je mail.'); },
+      function(){ showText(txt,'Kopieer de samenvatting hieronder:'); });
+  }catch(e){ showText(txt,'Kopieer de samenvatting hieronder:'); }
 };
 
 // ---------- posten ----------
@@ -328,48 +457,51 @@ function renderPosten(){
   var el=$('postList');
   el.innerHTML=state.posten.map(function(p,i){
     return '<div class="sleuf" data-i="'+i+'"><div class="grid2">'+
-      '<div><label>Naam</label><input class="pn" value="'+esc(p.naam)+'"></div>'+
-      '<div><label>Eenheid</label><input class="pe" value="'+esc(p.eenheid)+'"></div></div>'+
+      '<div><label for="pn_'+i+'">Naam</label><input class="pn" id="pn_'+i+'" value="'+esc(p.naam)+'"></div>'+
+      '<div><label for="pe_'+i+'">Eenheid</label><input class="pe" id="pe_'+i+'" value="'+esc(p.eenheid)+'"></div></div>'+
       '<div class="row" style="margin-top:8px">'+
-      '<button class="btn ghost small up"'+(i===0?' disabled':'')+'>▲</button>'+
-      '<button class="btn ghost small down"'+(i===state.posten.length-1?' disabled':'')+'>▼</button>'+
+      '<button class="btn ghost small up" aria-label="Omhoog"'+(i===0?' disabled':'')+'>▲</button>'+
+      '<button class="btn ghost small down" aria-label="Omlaag"'+(i===state.posten.length-1?' disabled':'')+'>▼</button>'+
       '<button class="btn danger small rm">Verwijder</button></div></div>';
   }).join('');
   Array.prototype.forEach.call(el.querySelectorAll('.sleuf'),function(box){
     var i=+box.dataset.i, p=state.posten[i];
-    box.querySelector('.pn').oninput=function(e){ p.naam=e.target.value; save(); };
-    box.querySelector('.pe').oninput=function(e){ p.eenheid=e.target.value; save(); };
+    box.querySelector('.pn').oninput=function(e){ p.naam=e.target.value; savePosten(); };
+    box.querySelector('.pe').oninput=function(e){ p.eenheid=e.target.value; savePosten(); };
     box.querySelector('.up').onclick=function(){ move(i,-1); };
     box.querySelector('.down').onclick=function(){ move(i,1); };
     box.querySelector('.rm').onclick=function(){
-      var used=state.dossiers.some(function(d){return d.sleuven.some(function(s){return s.v[p.id]!=null;});});
-      if(!confirm('Post “'+p.naam+'” verwijderen?'+(used?'\nIngevulde waarden voor deze post worden niet meer getoond.':''))) return;
-      state.posten.splice(i,1); save(); renderPosten();
+      var used=state.dossiers.some(function(d){return (d.sleuven||[]).some(function(s){return s.v&&s.v[p.id]!=null;});});
+      ask('Post “'+p.naam+'” verwijderen?'+(used?'\nIngevulde waarden voor deze post worden dan niet meer getoond.':'')).then(function(ok){
+        if(!ok) return; state.posten.splice(i,1); savePosten(); renderPosten();
+      });
     };
   });
 }
-function move(i,dir){ var a=state.posten; var j=i+dir; if(j<0||j>=a.length) return; var t=a[i]; a[i]=a[j]; a[j]=t; save(); renderPosten(); }
-$('addPost').onclick=function(){ state.posten.push({id:'p_'+uid(),naam:'Nieuwe post',eenheid:'m'}); save(); renderPosten(); };
+function move(i,dir){ var a=state.posten, j=i+dir; if(j<0||j>=a.length) return; var t=a[i]; a[i]=a[j]; a[j]=t; savePosten(); renderPosten(); }
+$('addPost').onclick=function(){ state.posten.push({id:'p_'+uid(),naam:'Nieuwe post',eenheid:'m'}); savePosten(); renderPosten(); };
 
-$('backupBtn').onclick=function(){
-  var now=new Date(), p=function(n){return String(n).padStart(2,'0');};
-  download(now.getFullYear()+p(now.getMonth()+1)+p(now.getDate())+'_'+p(now.getHours())+p(now.getMinutes())+'_opmeten-backup.json',JSON.stringify(state,null,1),'application/json');
-};
+$('backupBtn').onclick=function(){ offerFile(stamp()+'_opmeten-backup.json',JSON.stringify(state,null,1),'application/json'); };
 $('restoreFile').onchange=function(e){
   var f=e.target.files[0]; if(!f) return;
   var r=new FileReader();
   r.onload=function(){
-    try{
-      var s=JSON.parse(r.result);
-      if(!s.posten||!s.dossiers) throw 0;
-      if(!confirm('Back-up terugzetten? Dit vervangt alle huidige opmetingen op dit toestel.')) return;
-      state=s; save(); show('vList');
-    }catch(err){ alert('Dit is geen geldige back-up.'); }
+    var s; try{ s=JSON.parse(r.result); if(!s.posten||!s.dossiers) throw 0; }catch(err){ toast('Dit is geen geldige back-up.'); return; }
+    ask('Back-up terugzetten? Opmetingen met hetzelfde nummer worden overschreven, de andere blijven staan.','Terugzetten').then(function(ok){
+      if(!ok) return;
+      state.posten=s.posten; savePosten();
+      s.dossiers.forEach(function(d){
+        state.dossiers=state.dossiers.filter(function(x){return x.id!==d.id;});
+        state.dossiers.push(d); saveDossier(d);
+      });
+      show('vList'); toast(s.dossiers.length+' opmetingen teruggezet');
+    });
   };
   r.readAsText(f); e.target.value='';
 };
 
 show('vList');
+initDb();
 })();
 </script>
 </body>

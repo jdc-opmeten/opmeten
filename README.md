@@ -17,3 +17,8 @@ Gegevens worden enkel lokaal op het toestel bewaard (browseropslag).
 
 ## Gebruik
 Open `index.html` in de browser. Het is één bestand, er is geen installatie nodig.
+
+## Online versie
+Gepubliceerd als privé-pagina op claude.ai. Daar worden de opmetingen online bewaard (database van de pagina),
+zodat ze op al je toestellen beschikbaar zijn en Claude ze kan uitlezen. Lokaal geopend (bestand) bewaart de app
+alles op het toestel zelf.
