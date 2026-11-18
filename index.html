@@ -228,6 +228,7 @@
     return dp(pts.slice(0, mi + 1), tol).slice(0, -1).concat(dp(pts.slice(mi), tol));
   }
   function spoorVan(s) {   // gelopen spoor (zonder startpunt), vereenvoudigd; vaste punten (meetpunten, doorsteek) blijven staan
+    return [];
     var pad = s.pad || []; if (pad.length < 2) return [];
     var uit = [pad[0].slice(0, 2)], start = 0;
     for (var i = 1; i < pad.length; i++) {
@@ -239,6 +240,7 @@
     return uit.slice(1);
   }
   function spoor(g) {   // elke ~3 m een puntje van het gelopen pad bewaren (niet tijdens een doorsteek)
+    return;   // automatisch pad uitgeschakeld: enkel de punten die je zelf plaatst
     var n = S.sleuven.length; if (!n || !actief() || S.mp.t === 'einde' || !S.punten[n - 1]) return;
     var s = S.sleuven[n - 1]; if (!s.pad) s.pad = [];
     if (!s.pad.length) s.pad.push([S.punten[n - 1][0], S.punten[n - 1][1], 1]);
@@ -306,22 +308,6 @@
     haalPunt(function (pt) {
       var s = S.sleuven[S.sleuven.length - 1], mp = S.mp, nl = S.sleuven.length - 1;
       var info = '';
-      if (mp.t === 'einde') {   // doorsteek: eindpunt haaks op de weg zetten (richting van de weg = richting van het gelopen pad voor het beginpunt)
-        var D = s.tussen.filter(function (m) { return m.t === 'begin'; }).pop();
-        if (D) {
-          var pad = s.pad || [], q = null;
-          for (var i = pad.length - 1; i >= 0; i--) { if (afstand([pad[i][0], pad[i][1]], D.p) >= 4) { q = [pad[i][0], pad[i][1]]; break; } }
-          if (!q && S.punten[nl]) q = S.punten[nl];
-          if (!q && nl > 0 && S.punten[nl - 1]) q = S.punten[nl - 1];
-          if (q && afstand(q, D.p) >= 2) {
-            var v = xy(D.p, q), L2 = Math.sqrt(v[0] * v[0] + v[1] * v[1]), n2 = [-v[1] / L2, v[0] / L2], e = xy(pt, D.p), w = e[0] * n2[0] + e[1] * n2[1];
-            if (Math.abs(w) >= 1) { pt = ll([n2[0] * w, n2[1] * w], D.p); info = 'Doorsteek haaks op de weg getekend (' + Math.abs(w).toFixed(1).replace('.', ',') + ' m).'; }
-          }
-        }
-      }
-      if (!s.pad) s.pad = [];
-      if (!s.pad.length && S.punten[nl]) s.pad.push([S.punten[nl][0], S.punten[nl][1], 1]);
-      s.pad.push([pt[0], pt[1], 1]);
       s.tussen.push({ p: pt, z: mp.z, t: mp.t, n: '' });
       s.zijdeEinde = mp.z === s.zijde ? '' : mp.z;
       syncDoorsteek(s);
@@ -361,8 +347,8 @@
       }
       if (act) {
         var open = S.mp.t === 'einde';
-        h += '<div class="blok" style="margin:0"><h3>Onderweg<span class="klein"> (het pad wordt automatisch getekend terwijl je loopt)</span></h3>' +
-             (open ? '<button class="groot" id="bEinde" type="button" style="background:#b35c00">Einde doorsteek hier<small>' + S.mp.z.toLowerCase() + ' van de weg, de lijn wordt haaks op de weg getekend</small></button>'
+        h += '<div class="blok" style="margin:0"><h3>Onderweg<span class="klein"> (de lijn verbindt de punten die je zelf plaatst)</span></h3>' +
+             (open ? '<button class="groot" id="bEinde" type="button" style="background:#b35c00">Einde doorsteek hier<small>' + S.mp.z.toLowerCase() + ' van de weg</small></button>'
                    : '<div class="chips"><button type="button" class="chip" id="bBegin" style="flex:1">&harr; Begin doorsteek</button><button type="button" class="chip" id="bPunt" style="flex:1">&bull; Meetpunt</button></div>') +
              '<label class="veld">Waar sta je nu?</label><div class="chips">' +
              ZIJDEN.map(function (z) { return '<button type="button" class="chip' + (S.mp.z === z ? ' aan' : '') + '" data-mpz="' + z + '">' + z + '</button>'; }).join('') +
