@@ -14,7 +14,7 @@
   .tabs { display: flex; gap: 6px; margin-top: 8px; }
   .tabs button { flex: 1; padding: 9px; border: 1px solid #c8ced9; background: #fff; border-radius: 8px; font-size: .95rem; }
   .tabs button.aan { background: #1f7a3f; border-color: #1f7a3f; color: #fff; }
-  #map { height: 40vh; min-height: 260px; }
+  #map { height: 34vh; min-height: 220px; }
   #gps { font-size: .8rem; color: #6b7384; padding: 4px 10px; }
   .blok { background: #fff; border: 1px solid #d9dde5; border-radius: 12px; margin: 10px; padding: 12px; }
   .blok h3 { margin: 0 0 8px; font-size: 1rem; }
@@ -91,8 +91,11 @@
   .mrij label { font-weight: 600; font-size: .9rem; white-space: nowrap; }
   .mrij input { flex: 1; font-size: 1.3rem; padding: 8px; text-align: center; border: 1px solid #c8ced9; border-radius: 8px; min-width: 0; }
   .wislink { background: none; border: 0; color: #b42318; font-size: .85rem; padding: 6px; }
-  #kompas { position: absolute; z-index: 800; right: 10px; top: 10px; width: 42px; height: 42px; border-radius: 50%; border: 1px solid #c8ced9; background: #fff; font-size: 1.1rem; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+  #kompas { position: absolute; z-index: 1300; right: 10px; top: 10px; width: 42px; height: 42px; border-radius: 50%; border: 1px solid #c8ced9; background: #fff; font-size: 1.1rem; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
   #mapwrap { position: relative; }
+  #kslotlaag { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 1200; touch-action: pan-y; background: transparent; }
+  #kslot { position: absolute; z-index: 1300; left: 10px; top: 10px; height: 42px; padding: 0 14px; border-radius: 21px; border: 1px solid #c8ced9; background: #fff; font-size: .9rem; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+  #kslot.open { background: #1f7a43; color: #fff; border-color: #1f7a43; }
   .letter { background: #1d2330; color: #fff; border-radius: 50%; width: 22px; height: 22px; line-height: 22px; text-align: center; font-weight: 700; font-size: .75rem; border: 2px solid #fff; }
   .sleuflabel { background: #fff; border: 1px solid #1d2330; border-radius: 6px; padding: 1px 5px; font-weight: 600; font-size: .75rem; }
 .mp { background: #fff; border: 2px solid #b42318; color: #b42318; border-radius: 50%; width: 18px; height: 18px; line-height: 14px; text-align: center; font-weight: 700; font-size: .65rem; }
@@ -115,7 +118,7 @@
 </header>
 
 <section id="vOpmeten">
-  <div id="mapwrap"><div id="map"></div><button id="kompas" type="button" title="Kaart draait mee met je looprichting">&#129517;</button></div>
+  <div id="mapwrap"><div id="map"></div><div id="kslotlaag"></div><button id="kslot" type="button">&#128274; Kaart vast</button><button id="kompas" type="button" title="Kaart draait mee met je looprichting">&#129517;</button></div>
   <div id="gps">GPS: nog geen positie</div>
   <div class="knoppen" id="acties"></div>
   <div id="formulier"></div>
@@ -215,7 +218,21 @@
   }
 
   // ---------- Kaart ----------
-  var kaart = L.map('map', { zoomControl: true, rotate: true, bearing: 0, touchRotate: false, rotateControl: false }).setView([51.158, 4.445], 16);
+  var kaart = L.map('map', { zoomControl: false, rotate: true, bearing: 0, touchRotate: false, rotateControl: false }).setView([51.158, 4.445], 16);
+  L.control.zoom({ position: 'bottomleft' }).addTo(kaart);
+  // Kaart is standaard vast: scrollen op de kaart scrolt de pagina; de kaart past zichzelf aan. Knop linksboven maakt hem tijdelijk beweegbaar.
+  var kaartSlot = true, slotTimer = null;
+  function zetSlot(vast) {
+    kaartSlot = vast; clearTimeout(slotTimer);
+    $('kslotlaag').style.display = vast ? 'block' : 'none';
+    $('kslot').className = vast ? '' : 'open';
+    $('kslot').innerHTML = vast ? '&#128274; Kaart vast' : '&#128275; Kaart los';
+    document.querySelector('.leaflet-control-zoom').style.display = vast ? 'none' : '';
+    if (vast) { tekenKaart(true); }
+    else slotTimer = setTimeout(function () { zetSlot(true); }, 15000);
+  }
+  $('kslot').onclick = function () { zetSlot(!kaartSlot); };
+  $('map').addEventListener('pointerdown', function () { if (!kaartSlot) { clearTimeout(slotTimer); slotTimer = setTimeout(function () { zetSlot(true); }, 15000); } });
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -250,7 +267,8 @@
     if (actief() && laatstePos) {
       liveLijn = L.polyline([laatstePunt(), [laatstePos.lat, laatstePos.lng]], { color: kl(S.sleuven.length - 1), weight: 5, dashArray: '8 8', opacity: .9 }).addTo(laag);
     }
-    if (passen && alle.length) kaart.fitBounds(L.latLngBounds(alle), { maxZoom: 19, padding: [30, 30] });
+    if (kaartSlot && actief() && laatstePos) alle.push([laatstePos.lat, laatstePos.lng]);
+    if ((passen || kaartSlot) && alle.length) kaart.fitBounds(L.latLngBounds(alle), { maxZoom: 19, padding: [30, 30] });
   }
 
   // ---------- GPS ----------
@@ -697,10 +715,10 @@
 
   function renderAlles() { renderActies(); renderFormulier(); tekenKaart(false); }
   renderAlles();
-  if (S.sleuven.length) tekenKaart(true);
+  zetSlot(true);
   stuurRij();
 })();
 </script>
-<div class="appver">Opmeten 1.02</div>
+<div class="appver">Opmeten 1.03</div>
 </body>
 </html>
