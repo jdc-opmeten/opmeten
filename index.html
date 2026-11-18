@@ -63,7 +63,10 @@
   .gr th, .gr td { border: 1px solid #e3e6ec; padding: 3px 2px; text-align: center; white-space: nowrap; }
   .gr td.l, .gr th.l { text-align: left; position: sticky; left: 0; background: #fff; z-index: 2; padding: 4px 6px; max-width: 150px; white-space: normal; border-right: 2px solid #c8ced9; }
   .gr tr.sh td { background: #eef0f4; font-weight: 700; text-align: left; padding: 4px 6px; position: static; }
-  .gr td.sel, .gr th.sel { background: #f4faf6; }
+  .gr td.sel, .gr th.sel { background: #f4faf6; border-left: 3px solid var(--c); border-right: 3px solid var(--c); }
+  .gr th.sel { border-top: 3px solid var(--c); }
+  .gr td.sel.onder { border-bottom: 3px solid var(--c); }
+  .gr .zz { font-size: .8rem; min-width: 56px; color: #1d2330; border: 1px solid #c8ced9; border-radius: 12px; padding: 4px 6px; }
   .gr .kop { min-width: 38px; height: 34px; border-radius: 17px; border: 2px solid; background: #fff; font-weight: 700; font-size: 1rem; }
   .gr .sb { display: inline-block; min-width: 38px; padding: 5px 0; font-size: 1.25rem; color: #8a93a6; cursor: pointer; }
   .gr .sb.on { color: #1f7a3f; }
@@ -437,8 +440,11 @@
           '<button type="button" class="mid" id="navMid" style="border-color:' + k + '"><span class="badge" style="background:' + k + '">' + (sel + 1) + '</span><div><b>Sleuf ' + (sel + 1) + ' van ' + n + '</b><span class="t">' +
           (sel === n - 1 ? (act ? 'loopt nog &middot; tik om gegevens te wijzigen' : 'afgesloten &middot; tik om gegevens te wijzigen') : 'afgesloten &middot; tik om gegevens te wijzigen') + '</span></div></button>' +
           '<button type="button" class="pijl" data-nav="1"' + (sel >= n - 1 ? ' disabled' : '') + '>&rsaquo;</button></div>';
+      var terug = sel !== n - 1;
       h += '<div class="mrij"><label for="qMeters">Meters sleuf ' + (sel + 1) + '</label><input id="qMeters" type="number" inputmode="decimal" step="0.1" min="0" value="' + esc(s.meters) + '" placeholder="meetwiel"></div>';
-      if (act) {
+      if (terug) {
+        h += '<button class="groot" id="bTerug" type="button">Ga verder met de meting<small>sleuf ' + n + (act ? ' loopt nog' : ' is afgesloten') + '</small></button>';
+      } else if (act) {
         var open = S.mp.t === 'einde';
         h += (open ? '<button class="groot" id="bEinde" type="button" style="background:#b35c00">Einde doorsteek hier<small>' + S.mp.z.toLowerCase() + ' van de weg</small></button>'
                    : '<div class="twee"><button class="groot grijs" id="bPunt" type="button">&bull; Meetpunt</button><button class="groot grijs" id="bBegin" type="button">&harr; Begin doorsteek</button></div>') +
@@ -460,6 +466,7 @@
     if ((b = $('bBegin'))) b.onclick = function () { S.mp.t = 'begin'; meetpuntHier(); };
     if ((b = $('bPunt'))) b.onclick = function () { S.mp.t = 'punt'; meetpuntHier(); };
     if ((b = $('bEinde'))) b.onclick = function () { S.mp.t = 'einde'; meetpuntHier(); };
+    if ((b = $('bTerug'))) b.onclick = function () { S.sel = S.sleuven.length - 1; bewaar(); renderAlles(); window.scrollTo({ top: $('acties').offsetTop - 120, behavior: 'smooth' }); };
     if ((b = $('navMid'))) b.onclick = function () { var f = $('formulier'); if (f) f.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   }
   $('acties').addEventListener('click', function (e) {
@@ -479,12 +486,17 @@
     if (!S.sleuven.length) { f.innerHTML = '<div class="blok klein">Tik op "Start sleuf 1" om te beginnen. De GPS-positie wordt het eerste punt (A).</div>'; return; }
     var N = S.sleuven.length, sel = (S.sel >= 0 && S.sel < N) ? S.sel : N - 1;
     var sh = function (t) { return '<tr class="sh"><td colspan="' + (N + 1) + '">' + t + '</td></tr>'; };
-    var cel = function (fn) { return S.sleuven.map(function (x, k) { return '<td' + (k === sel ? ' class="sel"' : '') + '>' + fn(x, k) + '</td>'; }).join(''); };
+    var ord = [sel]; S.sleuven.forEach(function (x, k) { if (k !== sel) ord.push(k); });
+    var laatste = '';
+    var cel = function (fn) { return ord.map(function (k) { var x = S.sleuven[k]; return '<td' + (k === sel ? ' class="sel' + (laatste ? ' onder' : '') + '"' : '') + '>' + fn(x, k) + '</td>'; }).join(''); };
     var ctxAan = CTX.k.length || CTX.p.length;
-    var h = '<div class="blok" style="padding:8px"><h3 style="margin:2px 4px 6px">Gegevens per sleuf</h3><p class="klein" style="margin:0 4px 6px">Net als in de meetstaat: elke kolom is een sleuf. Tik op een cirkel om te kiezen, vul aantallen in. Veeg opzij voor meer sleuven. De cirkel onder de sleufnaam kopieert de gegevens van de vorige sleuf.</p><div class="gr"><table><tr><th class="l">Sleuf</th>' +
-      S.sleuven.map(function (x, k) { var c = kl(k); return '<th class="' + (k === sel ? 'sel' : '') + '"><button type="button" class="kop" data-gsel="' + k + '" style="border-color:' + c + ';' + (k === sel ? 'background:' + c + ';color:#fff' : 'color:' + c) + '">' + (k + 1) + '</button></th>'; }).join('') + '</tr>' +
+    var h = '<div class="blok" style="padding:8px"><h3 style="margin:2px 4px 6px">Gegevens per sleuf</h3><p class="klein" style="margin:0 4px 6px">Net als in de meetstaat: elke kolom is een sleuf. De sleuf waar je mee bezig bent staat eerst, omkaderd. Tik op een ander cijfer om die sleuf te kiezen en aan te passen. Het pijltje onder de sleufnaam kopieert de gegevens van de vorige sleuf.</p><div class="gr"><table style="--c:' + kl(sel) + '"><tr><th class="l">Sleuf</th>' +
+      ord.map(function (k) { var x = S.sleuven[k], c = kl(k); return '<th class="' + (k === sel ? 'sel' : '') + '"><button type="button" class="kop" data-gsel="' + k + '" style="border-color:' + c + ';' + (k === sel ? 'background:' + c + ';color:#fff' : 'color:' + c) + '">' + (k + 1) + '</button></th>'; }).join('') + '</tr>' +
       '<tr><td class="l klein">Zoals vorige</td>' + cel(function (x, k) { return k ? '<span class="sb" data-gv="' + k + '">&#8635;</span>' : ''; }) + '</tr>' +
       '<tr><td class="l"><b>Meters</b></td>' + cel(function (x, k) { return '<input class="gi" type="number" inputmode="decimal" step="0.1" min="0" data-gm="' + k + '" value="' + esc(x.meters) + '">'; }) + '</tr>' +
+      sh('Zijde van de weg (tik om te wisselen)') +
+      '<tr><td class="l">Begin</td>' + cel(function (x, k) { return '<span class="sb zz" data-zb="' + k + '">' + esc(x.zijde || '?') + '</span>'; }) + '</tr>' +
+      '<tr><td class="l">Einde</td>' + cel(function (x, k) { return '<span class="sb zz" data-ze="' + k + '">' + (x.zijdeEinde && x.zijdeEinde !== x.zijde ? esc(x.zijdeEinde) : '= begin') + '</span>'; }) + '</tr>' +
       sh('Wegbedekking') + BOVENBOUW.map(function (b) { return rijOptie(esc(b), '', cel(function (x, k) { var on = x.bovenbouw === b; return '<span class="sb' + (on ? ' on' : '') + '" data-gb="' + k + '" data-v="' + esc(b) + '">' + (on ? '&#9679;' : '&#9675;') + '</span>'; })); }).join('') +
       sh('Leidingen en kabels (aantal)');
     PARTIJEN.forEach(function (p) {
@@ -495,26 +507,34 @@
         h += rijOptie(esc(p.naam === 'Fluvius' || p.naam === 'Gas' ? t : p.naam + ': ' + t), '', cel(function (x, k) { return '<input class="gi" type="number" inputmode="numeric" min="0" data-gl="' + k + '" data-key="' + esc(key) + '" value="' + (x.leidingen[key] || '') + '">'; }));
       });
     });
+    laatste = '';
     h += sh('Bijzonderheden') + BIJZ.map(function (b) { return rijOptie(esc(b), '', cel(function (x, k) { var on = x.bijz.indexOf(b) >= 0; return '<span class="sb' + (on ? ' on' : '') + '" data-gz="' + k + '" data-v="' + esc(b) + '">' + (on ? '&#9679;' : '&#9675;') + '</span>'; })); }).join('') +
-      '<tr><td class="l">Opmerking</td>' + cel(function (x, k) { return '<input class="gi gt" type="text" data-go="' + k + '" value="' + esc(x.opm) + '">'; }) + '</tr></table></div>';
+      '<tr><td class="l">Opmerking</td>' + (function () { laatste = 1; var r = cel(function (x, k) { return '<input class="gi gt" type="text" data-go="' + k + '" value="' + esc(x.opm) + '">'; }); laatste = ''; return r; })() + '</tr></table></div>';
     h += '<div class="plus" style="margin:8px 4px 0"><select id="nwPartij">' + PARTIJEN.map(function (p) { return '<option>' + esc(p.naam) + '</option>'; }).join('') + '</select><input type="text" id="nwType" placeholder="Ander type leiding"><button type="button" data-voegtoe="1">+</button></div>';
     if (ctxAan) h += '<p style="margin:8px 4px 0"><button type="button" class="chip" data-toonalles="1">' + (TOONALLES ? 'Enkel de leidingen van dit dossier tonen' : 'Alle leidingen tonen') + '</button> <span class="klein">Dossier ' + esc(CTX.dnw) + ' &middot; kabels: ' + esc(CTX.k.join(', ') || '-') + ' &middot; partijen: ' + esc(CTX.p.join(', ') || '-') + '</span></p>';
     h += '</div>';
-    // meetpunten en zijde van de gekozen sleuf
-    var s = S.sleuven[sel], bezig = actief() && sel === N - 1, ds = doorsteken(s);
-    h += '<div class="blok" style="border:3px solid ' + kl(sel) + '"><h3>Sleuf ' + (sel + 1) + ': meetpunten' + (bezig ? '' : ' en zijde') + '</h3>';
-    if (!bezig) h += '<label class="veld">Zijde bij het begin</label><div class="chips">' + ZIJDEN.map(function (z) { return '<button type="button" class="chip' + (s.zijde === z ? ' aan' : '') + '" data-zijde="' + z + '">' + z + '</button>'; }).join('') + '</div>' +
-      '<label class="veld">Zijde bij het einde <span class="klein">(anders dan het begin = doorsteek)</span></label><div class="chips">' + [''].concat(ZIJDEN).map(function (z) { return '<button type="button" class="chip' + ((s.zijdeEinde || '') === z ? ' aan' : '') + '" data-zijdee="' + z + '">' + (z || 'Zelfde') + '</button>'; }).join('') + '</div>';
+    // meetpunten van de gekozen sleuf (enkel als er zijn)
+    var s = S.sleuven[sel], ds = doorsteken(s);
     if ((s.tussen || []).length) {
-      h += s.tussen.map(function (m, j) { return '<div class="mpregel"><span class="t"><b>' + (j + 1) + '.</b> ' + esc(MPTYPE[m.t]) + ' - ' + esc(m.z) + '</span><button type="button" data-delmp="' + j + '">&#10005;</button></div>'; }).join('');
+      h += '<div class="blok" style="border:3px solid ' + kl(sel) + '"><h3>Sleuf ' + (sel + 1) + ': meetpunten</h3>' + s.tussen.map(function (m, j) { return '<div class="mpregel"><span class="t"><b>' + (j + 1) + '.</b> ' + esc(MPTYPE[m.t]) + ' - ' + esc(m.z) + '</span><button type="button" data-delmp="' + j + '">&#10005;</button></div>'; }).join('');
       if (ds.length) h += '<div class="klein">' + ds.map(function (d, k) { return 'Doorsteek ' + (k + 1) + ': ' + d.van.z + ' &rarr; ' + d.tot.z + ', ca. ' + d.m + ' m (GPS)'; }).join('<br>') + '</div>';
-    } else h += '<div class="klein">Nog geen meetpunten of doorsteken.</div>';
-    h += '</div>';
+      h += '</div>';
+    }
     f.innerHTML = h;
     var g = f.querySelector('.gr'); if (g) g.scrollLeft = sl;
   }
 
   $('formulier').addEventListener('click', function (e) {
+    var zc = e.target.closest('[data-zb],[data-ze]');
+    if (zc) {
+      var kz = +(zc.dataset.zb !== undefined ? zc.dataset.zb : zc.dataset.ze), sz = S.sleuven[kz];
+      if (sz) {
+        if (zc.dataset.zb !== undefined) { sz.zijde = ZIJDEN[(ZIJDEN.indexOf(sz.zijde) + 1) % 3]; if (sz.zijdeEinde === sz.zijde) sz.zijdeEinde = ''; }
+        else { var cyc = ['', 'Links', 'Midden', 'Rechts'], cur = sz.zijdeEinde && sz.zijdeEinde !== sz.zijde ? sz.zijdeEinde : '', nx = cyc[(cyc.indexOf(cur) + 1) % 4]; if (nx === sz.zijde) nx = cyc[(cyc.indexOf(nx) + 1) % 4]; sz.zijdeEinde = nx; }
+        syncDoorsteek(sz); bewaar(); renderFormulier(); tekenKaart(false); renderActies();
+      }
+      return;
+    }
     var td = e.target.closest('[data-gsel],[data-gv],[data-gb],[data-gz]');
     if (td) {
       var dd = td.dataset;
