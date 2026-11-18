@@ -116,7 +116,18 @@
     { naam: 'Telecom en overige', types: ['Coax 20 mm', 'Coax 14 mm', 'Wachtbuis', 'DB 7'] }
   ];
   var ZIJDEN = ['Links', 'Midden', 'Rechts'];
-  var SLEUTEL = 'opmeten.v1';
+  // Gegevens van het dossier, meegegeven door het portaal werfcoordinatie (?dnw=..&werf=..&k=LS,OV&p=Wlink,Pidpa)
+  var Q = {}; try { new URLSearchParams(location.search).forEach(function (v, k) { Q[k] = v; }); } catch (e) {}
+  var CTX = { dnw: (Q.dnw || '').replace(/\D/g, ''), werf: Q.werf || '', k: (Q.k || '').split(',').filter(Boolean), p: (Q.p || '').split(',').filter(Boolean) };
+  var SLEUTEL = 'opmeten.v1' + (CTX.dnw ? '.' + CTX.dnw : '');   // elke werf uit het portaal heeft zijn eigen opmeting
+  var TOONALLES = false;
+  function relevant(naam, t) {
+    if (!CTX.k.length && !CTX.p.length) return true;
+    if (naam === 'Fluvius') return !t || CTX.k.some(function (k) { return t.indexOf(k) === 0; }) || (S.eigen.Fluvius || []).indexOf(t) >= 0;
+    if (naam === 'Gas') return CTX.k.indexOf('Gas') >= 0;
+    if (naam === 'Drinkwater') return CTX.p.indexOf('Pidpa') >= 0;
+    return CTX.p.some(function (x) { return x !== 'Pidpa'; });
+  }
 
   // ---------- Toestand ----------
   var S = { werf: '', punten: [], sleuven: [], eigen: {}, sel: -1, mp: { t: 'punt', z: 'Rechts' } };
@@ -339,14 +350,19 @@
     h += '<div class="blok">' + vorigeKnop('bovenbouw') + '<h3>Bovenbouw</h3><div class="chips">' + BOVENBOUW.map(function (b) { return '<button type="button" class="chip' + (s.bovenbouw === b ? ' aan' : '') + '" data-bovenbouw="' + esc(b) + '">' + esc(b) + '</button>'; }).join('') + '</div></div>';
 
     h += '<div class="blok">' + vorigeKnop('leidingen') + '<h3>Leidingen en kabels</h3>';
+    var ctxAan = CTX.k.length || CTX.p.length;
+    if (ctxAan) h += '<div class="klein" style="margin-bottom:6px">Dossier ' + esc(CTX.dnw) + ' &middot; kabels: <b>' + esc(CTX.k.join(', ') || '-') + '</b> &middot; partijen: <b>' + esc(CTX.p.join(', ') || '-') + '</b></div>';
     PARTIJEN.forEach(function (p) {
+      if (!TOONALLES && !relevant(p.naam)) return;
       h += '<label class="veld">' + esc(p.naam) + '</label><div class="chips">';
       typesVan(p.naam).forEach(function (t) {
+        if (!TOONALLES && !relevant(p.naam, t)) return;
         var k = p.naam + '|' + t;
         h += '<button type="button" class="chip' + (s.leidingen[k] ? ' aan' : '') + '" data-leiding="' + esc(k) + '">' + esc(t) + '</button>';
       });
       h += '</div><div class="plus"><input type="text" placeholder="Ander type bij ' + esc(p.naam) + '" data-nieuwtype="' + esc(p.naam) + '"><button type="button" data-voegtoe="' + esc(p.naam) + '">+</button></div>';
     });
+    if (ctxAan) h += '<p><button type="button" class="chip" data-toonalles="1">' + (TOONALLES ? 'Enkel de leidingen van dit dossier tonen' : 'Alle leidingen tonen') + '</button></p>';
     var gekozen = Object.keys(s.leidingen);
     if (gekozen.length) {
       h += '<label class="veld" style="margin-top:12px">Aantal per gekozen leiding</label>';
@@ -365,7 +381,8 @@
     var el = e.target.closest('button'); if (!el) return;
     var s = S.sleuven[S.sel]; if (!s) return;
     var d = el.dataset, vorige = S.sleuven[S.sel - 1];
-    if (d.zijde) { s.zijde = d.zijde; syncDoorsteek(s); }
+    if (d.toonalles) { TOONALLES = !TOONALLES; }
+    else if (d.zijde) { s.zijde = d.zijde; syncDoorsteek(s); }
     else if (d.zijdee !== undefined) { s.zijdeEinde = d.zijdee === s.zijde ? '' : d.zijdee; syncDoorsteek(s); }
     else if (d.delmp !== undefined) { s.tussen.splice(+d.delmp, 1); }
     else if (d.bovenbouw !== undefined) s.bovenbouw = (s.bovenbouw === d.bovenbouw ? '' : d.bovenbouw);
@@ -463,6 +480,7 @@
   }
   $('tabOpmeten').onclick = function () { toon('opmeten'); };
   $('tabOverzicht').onclick = function () { toon('overzicht'); };
+  if (!S.werf && CTX.werf) { S.werf = CTX.werf; bewaar(); }
   $('werf').value = S.werf || '';
   $('werf').addEventListener('input', function () { S.werf = this.value; bewaar(); });
 
