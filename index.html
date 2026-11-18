@@ -71,6 +71,7 @@
   .zij { display: flex; gap: 6px; align-items: center; }
   .zij .lbl { font-size: .85rem; color: #6b7384; margin-right: 2px; }
   .zij .chip { flex: 1; padding: 8px 4px; text-align: center; }
+  .chip.aan2 { background: #dcf3e4; border-color: #1f7a3f; color: #1f7a3f; font-weight: 700; }
   .mrij { display: flex; gap: 8px; align-items: center; }
   .mrij label { font-weight: 600; font-size: .9rem; white-space: nowrap; }
   .mrij input { flex: 1; font-size: 1.3rem; padding: 8px; text-align: center; border: 1px solid #c8ced9; border-radius: 8px; min-width: 0; }
@@ -267,16 +268,65 @@
     var l = s.pad[s.pad.length - 1];
     if (laatstePos.nauw <= 10 && afstand([l[0], l[1]], g) >= 3) { s.pad.push([g[0], g[1], 0]); bewaar(); return true; }
   }
+  // ---------- Zijde van de weg automatisch bepalen (OpenStreetMap-wegen via Overpass) ----------
+  var ROADS = [], ROADC = null, HEAD = null, WEGINFO = '', kand = { z: '', n: 0 };
+  function haalWegen(la, ln) {
+    if (ROADC && afstand(ROADC, [la, ln]) < 50) return;
+    ROADC = [la, ln];
+    var q = '[out:json][timeout:12];way(around:100,' + la + ',' + ln + ')["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$"];out geom tags;';
+    function klaar(j) { ROADS = (j.elements || []).filter(function (e) { return e.geometry && e.geometry.length > 1; }).map(function (e) { return { naam: (e.tags && e.tags.name) || '', pts: e.geometry.map(function (g) { return [g.lat, g.lon]; }) }; }); WEGINFO = ROADS.length ? '' : ' - geen wegen gevonden voor automatische zijde'; }
+    function probeer(url) { return fetch(url + '?data=' + encodeURIComponent(q)).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
+    probeer('https://overpass-api.de/api/interpreter').catch(function () { return probeer('https://overpass.kumi.systems/api/interpreter'); }).then(klaar).catch(function () { ROADC = null; WEGINFO = ' - wegen niet geladen (zijde handmatig)'; });
+  }
+  function zijdeNu(g) {   // geeft {z, d, naam} t.o.v. de dichtstbijzijnde weg en je looprichting, of null
+    if (!ROADS.length || !HEAD) return null;
+    var best = null;
+    ROADS.forEach(function (w) {
+      for (var i = 0; i < w.pts.length - 1; i++) {
+        var A = xy(w.pts[i], g), B = xy(w.pts[i + 1], g), dx = B[0] - A[0], dy = B[1] - A[1], L2 = dx * dx + dy * dy, t = L2 ? Math.max(0, Math.min(1, (-A[0] * dx - A[1] * dy) / L2)) : 0, cx = A[0] + t * dx, cy = A[1] + t * dy, d = Math.sqrt(cx * cx + cy * cy);
+        if (!best || d < best.d) best = { d: d, dx: dx, dy: dy, cx: cx, cy: cy, naam: w.naam };
+      }
+    });
+    if (!best || best.d > 40) return null;
+    var Ln = Math.sqrt(best.dx * best.dx + best.dy * best.dy); if (!Ln) return null;
+    var ux = best.dx / Ln, uy = best.dy / Ln, hr = HEAD.h * Math.PI / 180, vx = Math.sin(hr), vy = Math.cos(hr), dot = ux * vx + uy * vy;
+    if (Math.abs(dot) < 0.5) return null;   // je loopt dwars op de weg
+    if (dot < 0) { ux = -ux; uy = -uy; }
+    var wx = -best.cx, wy = -best.cy, cr = ux * wy - uy * wx;   // positief: je staat links van de weg (in je looprichting)
+    return { z: cr > 0 ? 'Links' : 'Rechts', d: Math.abs(cr), naam: best.naam };
+  }
+  function zetZijde(z, auto) {
+    var oud = S.mp.z; if (z === oud) return;
+    S.mp.z = z; bewaar();
+    if (auto) { S.alert = { van: oud, naar: z, t: Date.now() }; try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) { } setTimeout(function () { if (!(document.activeElement && document.activeElement.id === 'qMeters')) renderActies(); }, 10200); }
+    if (!(document.activeElement && document.activeElement.id === 'qMeters')) renderActies();
+  }
+  function autoZijde(g) {
+    if (S.zAuto === false) return;
+    var r = zijdeNu(g);
+    if (!S.sleuven.length) { if (r && r.d >= 1.5) S.mp.z = r.z; return; }
+    if (!actief()) return;
+    if (r) $('gps').textContent = 'GPS: nauwkeurigheid ongeveer ' + Math.round(laatstePos.nauw) + ' m' + (r.naam ? ' \u00b7 ' + r.naam : '') + ' \u00b7 ' + r.d.toFixed(0) + ' m ' + r.z.toLowerCase() + ' van de wegas';
+    if (!r || r.d < 1.5 || laatstePos.nauw > 8) { kand.n = 0; return; }
+    var open = S.mp.t === 'einde', D = open ? S.sleuven[S.sleuven.length - 1].tussen.filter(function (m) { return m.t === 'begin'; }).pop() : null;
+    if (open && D && r.z === D.z) { kand.n = 0; return; }   // tijdens een doorsteek pas wisselen als je echt aan de overkant staat
+    if (r.z === S.mp.z) { kand.n = 0; return; }
+    if (kand.z === r.z) kand.n++; else { kand.z = r.z; kand.n = 1; }
+    if (kand.n >= 4) { kand.n = 0; zetZijde(r.z, true); }
+  }
   function zetPos(p) {
     laatstePos = { lat: p.coords.latitude, lng: p.coords.longitude, nauw: p.coords.accuracy, t: Date.now() };
     BUF.push(laatstePos);
+    if (p.coords.heading != null && !isNaN(p.coords.heading) && (p.coords.speed || 0) > 0.7) HEAD = { h: p.coords.heading, t: Date.now() };
+    if (laatstePos.nauw <= 25) haalWegen(laatstePos.lat, laatstePos.lng);
     if (p.coords.heading != null && !isNaN(p.coords.heading) && (p.coords.speed || 0) > 0.7) draai(p.coords.heading);
     var gp = glad() || [laatstePos.lat, laatstePos.lng], nieuwSpoor = spoor(gp);
     $('gps').textContent = 'GPS: nauwkeurigheid ongeveer ' + Math.round(laatstePos.nauw) + ' m';
     if (!mijn) { mijn = L.circleMarker([laatstePos.lat, laatstePos.lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#1a73e8', fillOpacity: 1 }).addTo(kaart); nauwk = L.circle([laatstePos.lat, laatstePos.lng], { radius: laatstePos.nauw, color: '#1a73e8', weight: 1, fillOpacity: .1 }).addTo(kaart); if (!S.punten.length) kaart.setView([laatstePos.lat, laatstePos.lng], 18); }
     else { mijn.setLatLng([laatstePos.lat, laatstePos.lng]); nauwk.setLatLng([laatstePos.lat, laatstePos.lng]); nauwk.setRadius(laatstePos.nauw); }
     if (nieuwSpoor || (S.sleuven.length && actief() && !liveLijn)) tekenKaart(false);
-    else if (liveLijn && S.punten.length) liveLijn.setLatLngs([laatstePunt(), [laatstePos.lat, laatstePos.lng]]);
+    autoZijde(gp);
+    if (!(nieuwSpoor || (S.sleuven.length && actief() && !liveLijn)) && liveLijn && S.punten.length) liveLijn.setLatLngs([laatstePunt(), [laatstePos.lat, laatstePos.lng]]);
   }
   // Kaart draait mee met je looprichting (GPS-richting zodra je beweegt); knop rechtsboven zet dit aan of uit
   var DRAAI = true, richting = null;
@@ -315,7 +365,7 @@
     haalPunt(function (pt) {
       var vorige = S.sleuven.length ? S.sleuven[S.sleuven.length - 1] : null;
       S.punten.push(pt);
-      S.sleuven.push(nieuweSleuf(vorige)); S.mp = { t: 'punt', z: S.sleuven[S.sleuven.length - 1].zijde };
+      S.sleuven.push(nieuweSleuf(vorige)); S.sleuven[S.sleuven.length - 1].zijde = S.mp.z; S.mp = { t: 'punt', z: S.mp.z };
       S.sel = S.sleuven.length - 1;
       bewaar(); renderAlles(); kaart.setView(pt, Math.max(kaart.getZoom(), 18));
     });
@@ -324,7 +374,8 @@
     haalPunt(function (pt) {
       S.punten.push(pt);
       var vorige = S.sleuven[S.sleuven.length - 1];
-      S.sleuven.push(nieuweSleuf(vorige)); S.mp = { t: 'punt', z: S.sleuven[S.sleuven.length - 1].zijde };
+      vorige.zijdeEinde = S.mp.z === vorige.zijde ? '' : S.mp.z; syncDoorsteek(vorige);
+      var nz = S.mp.z; S.sleuven.push(nieuweSleuf(vorige)); S.sleuven[S.sleuven.length - 1].zijde = nz; S.mp = { t: 'punt', z: nz };
       S.sel = S.sleuven.length - 1;
       bewaar(); renderAlles();
     });
@@ -336,7 +387,7 @@
     bewaar(); renderAlles();
   }
   function eindeLaatste() {
-    haalPunt(function (pt) { S.punten.push(pt); S.sel = S.sleuven.length - 1; bewaar(); renderAlles(); });
+    haalPunt(function (pt) { S.punten.push(pt); var v = S.sleuven[S.sleuven.length - 1]; if (v) { v.zijdeEinde = S.mp.z === v.zijde ? '' : S.mp.z; syncDoorsteek(v); } S.sel = S.sleuven.length - 1; bewaar(); renderAlles(); });
   }
   function meetpuntHier() {
     if (!actief() || !S.sleuven.length) return;
@@ -379,7 +430,8 @@
         var open = S.mp.t === 'einde';
         h += (open ? '<button class="groot" id="bEinde" type="button" style="background:#b35c00">Einde doorsteek hier<small>' + S.mp.z.toLowerCase() + ' van de weg</small></button>'
                    : '<div class="twee"><button class="groot grijs" id="bPunt" type="button">&bull; Meetpunt</button><button class="groot grijs" id="bBegin" type="button">&harr; Begin doorsteek</button></div>') +
-             '<div class="zij"><span class="lbl">Waar:</span>' + ZIJDEN.map(function (z) { return '<button type="button" class="chip' + (S.mp.z === z ? ' aan' : '') + '" data-mpz="' + z + '">' + z + '</button>'; }).join('') + '</div>' +
+             (S.alert && Date.now() - S.alert.t < 10000 ? '<div style="background:#fff4e5;border:1px solid #e08a00;border-radius:10px;padding:8px 10px;font-size:.9rem"><b>Opgepast:</b> zijde automatisch gewisseld naar ' + S.alert.naar.toLowerCase() + '. <button type="button" class="chip" data-mpz="' + S.alert.van + '" style="padding:4px 10px">Terug naar ' + S.alert.van.toLowerCase() + '</button></div>' : '') +
+             '<div class="zij"><span class="lbl">Waar:</span><button type="button" class="chip' + (S.zAuto !== false ? ' aan' : '') + '" data-mpz="auto">Auto</button>' + ZIJDEN.map(function (z) { return '<button type="button" class="chip' + (S.mp.z === z ? (S.zAuto !== false ? ' aan2' : ' aan') : '') + '" data-mpz="' + z + '">' + z + '</button>'; }).join('') + '</div>' +
              '<div class="twee"><button class="groot" id="bVolgende" type="button">Stopt hier &rarr; sleuf ' + (n + 1) + '</button><button class="groot grijs" id="bLaatste" type="button">Stopt hier, klaar</button></div>';
       } else {
         h += '<button class="groot" id="bNieuw" type="button">Nog een sleuf toevoegen<small>start op het laatste punt (' + letter(n) + ')</small></button>';
@@ -401,7 +453,7 @@
   $('acties').addEventListener('click', function (e) {
     var mt = e.target.closest('button[data-mpt]'), mz = e.target.closest('button[data-mpz]');
     if (mt) { S.mp.t = mt.dataset.mpt; if (S.mp.t === 'einde') { var lb = S.sleuven.length ? S.sleuven[S.sleuven.length - 1].tussen.filter(function (m) { return m.t === 'begin'; }).pop() : null; if (lb) S.mp.z = andere(lb.z); } bewaar(); renderActies(); return; }
-    if (mz) { S.mp.z = mz.dataset.mpz; bewaar(); renderActies(); return; }
+    if (mz) { var zv = mz.dataset.mpz; if (zv === 'auto') { S.zAuto = true; kand.n = 0; } else { S.zAuto = false; S.mp.z = zv; } S.alert = null; bewaar(); renderActies(); return; }
     var nv = e.target.closest('button[data-nav]');
     if (nv) { var t2 = Math.max(0, Math.min(S.sleuven.length - 1, (S.sel < 0 ? S.sleuven.length - 1 : S.sel) + (+nv.dataset.nav))); S.sel = t2; bewaar(); renderAlles(); return; }
     var el = e.target.closest('button[data-sel]'); if (!el) return;
@@ -417,7 +469,7 @@
     var vorigeKnop = function (wat) { return heeftVorige ? '<button class="vorige" type="button" data-vorige="' + wat + '">Zoals vorige</button>' : ''; };
     var bezig = actief() && i === S.sleuven.length - 1;
     h += '<div class="blok" style="border:3px solid ' + kl(i) + '"><h3 style="font-size:1.2rem"><span style="display:inline-block;background:' + kl(i) + ';color:#fff;border-radius:50%;width:30px;height:30px;line-height:30px;text-align:center;margin-right:8px">' + (i + 1) + '</span>Sleuf ' + (i + 1) + ' <span class="klein">(' + letter(i) + (S.punten.length > i + 1 ? ' tot ' + letter(i + 1) : ' loopt nog') + ')</span>' + (bezig ? '<span class="tag bezig">bezig</span>' : '<span class="tag klaar">afgesloten</span>') + '</h3>';
-    h += '<label class="veld">Zijde van de straat bij het begin</label><div class="chips">' + ZIJDEN.map(function (z) { return '<button type="button" class="chip' + (s.zijde === z ? ' aan' : '') + '" data-zijde="' + z + '">' + z + '</button>'; }).join('') + '</div>' +
+    if (!bezig) h += '<label class="veld">Zijde van de straat bij het begin</label><div class="chips">' + ZIJDEN.map(function (z) { return '<button type="button" class="chip' + (s.zijde === z ? ' aan' : '') + '" data-zijde="' + z + '">' + z + '</button>'; }).join('') + '</div>' +
       '<label class="veld">Zijde bij het einde <span class="klein">(anders dan het begin = doorsteek)</span></label><div class="chips">' + [''].concat(ZIJDEN).map(function (z) { return '<button type="button" class="chip' + ((s.zijdeEinde || '') === z ? ' aan' : '') + '" data-zijdee="' + z + '">' + (z || 'Zelfde') + '</button>'; }).join('') + '</div>';
     var ds = doorsteken(s);
     if ((s.tussen || []).length) {
