@@ -60,6 +60,11 @@
   .verborgen { display: none; }
   .letter { background: #1d2330; color: #fff; border-radius: 50%; width: 22px; height: 22px; line-height: 22px; text-align: center; font-weight: 700; font-size: .75rem; border: 2px solid #fff; }
   .sleuflabel { background: #fff; border: 1px solid #1d2330; border-radius: 6px; padding: 1px 5px; font-weight: 600; font-size: .75rem; }
+.mp { background: #fff; border: 2px solid #b42318; color: #b42318; border-radius: 50%; width: 18px; height: 18px; line-height: 14px; text-align: center; font-weight: 700; font-size: .65rem; }
+  .mp.ok { border-color: #1f7a3f; color: #1f7a3f; }
+  .mpregel { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid #eef0f4; font-size: .9rem; }
+  .mpregel span.t { flex: 1; }
+  .mpregel button { border: 1px solid #b42318; color: #b42318; background: #fff; border-radius: 8px; padding: 4px 9px; }
 </style>
 </head>
 <body>
@@ -114,8 +119,16 @@
   var SLEUTEL = 'opmeten.v1';
 
   // ---------- Toestand ----------
-  var S = { werf: '', punten: [], sleuven: [], eigen: {}, sel: -1 };
+  var S = { werf: '', punten: [], sleuven: [], eigen: {}, sel: -1, mp: { t: 'punt', z: 'Rechts' } };
   try { var opgeslagen = JSON.parse(localStorage.getItem(SLEUTEL)); if (opgeslagen && opgeslagen.sleuven) S = opgeslagen; } catch (e) {}
+  if (!S.mp) S.mp = { t: 'punt', z: 'Rechts' };
+  S.sleuven.forEach(function (x) { x.tussen = x.tussen || []; x.zijdeEinde = x.zijdeEinde || ''; });
+  var MPTYPE = { punt: 'Meetpunt (sleuf loopt door)', begin: 'Begin doorsteek', einde: 'Einde doorsteek' };
+  function afstand(a, b) { var R = 6371000, r = Math.PI / 180, dl = (b[0] - a[0]) * r, dn = (b[1] - a[1]) * r; var x = Math.sin(dl / 2) * Math.sin(dl / 2) + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dn / 2) * Math.sin(dn / 2); return 2 * R * Math.asin(Math.sqrt(x)); }
+  function andere(z) { return z === 'Links' ? 'Rechts' : 'Links'; }
+  function doorsteken(s) { var r = [], b = null; (s.tussen || []).forEach(function (m) { if (m.t === 'begin') b = m; else if (m.t === 'einde' && b) { r.push({ van: b, tot: m, m: Math.round(afstand(b.p, m.p)) }); b = null; } }); return r; }
+  function syncDoorsteek(s) { var d = (s.tussen || []).some(function (m) { return m.t === 'begin' || m.t === 'einde'; }) || (s.zijdeEinde && s.zijdeEinde !== s.zijde); if (d && s.bijz.indexOf('Doorsteek') < 0) s.bijz.push('Doorsteek'); }
+  function laatstePunt() { var n = S.sleuven.length; if (!n) return null; var t = S.sleuven[n - 1].tussen; if (actief() && t && t.length) return t[t.length - 1].p; return S.punten[S.punten.length - 1]; }
   function bewaar() { try { localStorage.setItem(SLEUTEL, JSON.stringify(S)); } catch (e) {} }
 
   function $(id) { return document.getElementById(id); }
@@ -129,7 +142,7 @@
   function typesVan(p) { var basis = PARTIJEN.filter(function (x) { return x.naam === p; })[0].types; return basis.concat(S.eigen[p] || []); }
   function nieuweSleuf(vorige) {
     return {
-      meters: '', zijde: vorige ? vorige.zijde : 'Rechts',
+      meters: '', zijde: vorige ? (vorige.zijdeEinde || vorige.zijde) : 'Rechts', zijdeEinde: '', tussen: [],
       bovenbouw: vorige ? vorige.bovenbouw : '',
       leidingen: vorige ? kopie(vorige.leidingen) : {},
       bijz: vorige ? vorige.bijz.slice() : [], opm: ''
@@ -156,9 +169,18 @@
       alle.push(p);
     });
     S.sleuven.forEach(function (s, i) {
+      var tp = (s.tussen || []).map(function (m) { return m.p; });
+      (s.tussen || []).forEach(function (m, j) {
+        var mk = L.marker(m.p, { draggable: true, icon: L.divIcon({ className: '', html: '<div class="mp' + (m.t === 'punt' ? ' ok' : '') + '">' + (m.t === 'begin' ? 'D' : m.t === 'einde' ? 'E' : '•') + '</div>', iconSize: [18, 18], iconAnchor: [9, 9] }) });
+        mk.on('dragend', function () { var ll = mk.getLatLng(); m.p = [ll.lat, ll.lng]; bewaar(); tekenKaart(false); });
+        mk.bindTooltip((m.z || '') + ' - ' + MPTYPE[m.t], { direction: 'top' });
+        mk.addTo(laag);
+      });
+      doorsteken(s).forEach(function (d) { L.polyline([d.van.p, d.tot.p], { color: '#b42318', weight: 10, opacity: .45, dashArray: '2 8' }).addTo(laag); });
+      if (S.punten.length <= i + 1 && tp.length) L.polyline([S.punten[i]].concat(tp), { color: kl(i), weight: 5, opacity: .9 }).addTo(laag);
       if (S.punten.length > i + 1) {
         var a = S.punten[i], b = S.punten[i + 1];
-        var lijn = L.polyline([a, b], { color: KLEUR[s.bovenbouw] || KLEUR[''], weight: i === S.sel ? 8 : 5, opacity: .9 });
+        var lijn = L.polyline([a].concat(tp, [b]), { color: KLEUR[s.bovenbouw] || KLEUR[''], weight: i === S.sel ? 8 : 5, opacity: .9 });
         lijn.on('click', function () { S.sel = i; bewaar(); renderAlles(); });
         lijn.bindTooltip('Sleuf ' + (i + 1) + (s.meters ? ' (' + s.meters + ' m)' : ''), { permanent: true, direction: 'center', className: 'sleuflabel' });
         lijn.addTo(laag);
@@ -166,7 +188,7 @@
     });
     liveLijn = null;
     if (S.sleuven.length && actief() && laatstePos) {
-      liveLijn = L.polyline([S.punten[S.punten.length - 1], [laatstePos.lat, laatstePos.lng]], { color: kl(S.sleuven.length - 1), weight: 5, dashArray: '8 8', opacity: .9 }).addTo(laag);
+      liveLijn = L.polyline([laatstePunt(), [laatstePos.lat, laatstePos.lng]], { color: kl(S.sleuven.length - 1), weight: 5, dashArray: '8 8', opacity: .9 }).addTo(laag);
     }
     if (passen && alle.length) kaart.fitBounds(L.latLngBounds(alle), { maxZoom: 19, padding: [30, 30] });
   }
@@ -177,7 +199,7 @@
     $('gps').textContent = 'GPS: nauwkeurigheid ongeveer ' + Math.round(laatstePos.nauw) + ' m';
     if (!mijn) { mijn = L.circleMarker([laatstePos.lat, laatstePos.lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#1a73e8', fillOpacity: 1 }).addTo(kaart); nauwk = L.circle([laatstePos.lat, laatstePos.lng], { radius: laatstePos.nauw, color: '#1a73e8', weight: 1, fillOpacity: .1 }).addTo(kaart); if (!S.punten.length) kaart.setView([laatstePos.lat, laatstePos.lng], 18); }
     else { mijn.setLatLng([laatstePos.lat, laatstePos.lng]); nauwk.setLatLng([laatstePos.lat, laatstePos.lng]); nauwk.setRadius(laatstePos.nauw); }
-    if (liveLijn && S.punten.length) liveLijn.setLatLngs([S.punten[S.punten.length - 1], [laatstePos.lat, laatstePos.lng]]);
+    if (liveLijn && S.punten.length) liveLijn.setLatLngs([laatstePunt(), [laatstePos.lat, laatstePos.lng]]);
     else if (S.sleuven.length && actief() && !liveLijn) tekenKaart(false);
   }
   if ('geolocation' in navigator) {
@@ -202,7 +224,7 @@
     haalPunt(function (pt) {
       var vorige = S.sleuven.length ? S.sleuven[S.sleuven.length - 1] : null;
       S.punten.push(pt);
-      S.sleuven.push(nieuweSleuf(vorige));
+      S.sleuven.push(nieuweSleuf(vorige)); S.mp = { t: 'punt', z: S.sleuven[S.sleuven.length - 1].zijde };
       S.sel = S.sleuven.length - 1;
       bewaar(); renderAlles(); kaart.setView(pt, Math.max(kaart.getZoom(), 18));
     });
@@ -211,19 +233,32 @@
     haalPunt(function (pt) {
       S.punten.push(pt);
       var vorige = S.sleuven[S.sleuven.length - 1];
-      S.sleuven.push(nieuweSleuf(vorige));
+      S.sleuven.push(nieuweSleuf(vorige)); S.mp = { t: 'punt', z: S.sleuven[S.sleuven.length - 1].zijde };
       S.sel = S.sleuven.length - 1;
       bewaar(); renderAlles();
     });
   }
   function nieuweNaEinde() {
     var vorige = S.sleuven[S.sleuven.length - 1];
-    S.sleuven.push(nieuweSleuf(vorige));
+    S.sleuven.push(nieuweSleuf(vorige)); S.mp = { t: 'punt', z: S.sleuven[S.sleuven.length - 1].zijde };
     S.sel = S.sleuven.length - 1;
     bewaar(); renderAlles();
   }
   function eindeLaatste() {
     haalPunt(function (pt) { S.punten.push(pt); S.sel = S.sleuven.length - 1; bewaar(); renderAlles(); });
+  }
+  function meetpuntHier() {
+    if (!actief() || !S.sleuven.length) return;
+    haalPunt(function (pt) {
+      var s = S.sleuven[S.sleuven.length - 1], mp = S.mp;
+      s.tussen.push({ p: pt, z: mp.z, t: mp.t, n: '' });
+      s.zijdeEinde = mp.z === s.zijde ? '' : mp.z;
+      syncDoorsteek(s);
+      if (mp.t === 'begin') { S.mp = { t: 'einde', z: andere(mp.z) }; }
+      else if (mp.t === 'einde') { S.mp = { t: 'punt', z: mp.z }; }
+      S.sel = S.sleuven.length - 1;
+      bewaar(); renderAlles();
+    });
   }
   function verwijderLaatste() {
     if (!S.sleuven.length) return;
@@ -253,7 +288,12 @@
         }).join('') + '</div>';
       }
       if (act) {
-        h += '<button class="groot" id="bVolgende" type="button">Sleuf ' + n + ' stopt hier, en ik begin sleuf ' + (n + 1) + '<small>het eindpunt van sleuf ' + n + ' is ook het startpunt van sleuf ' + (n + 1) + '</small></button>' +
+        h += '<div class="blok" style="margin:0"><h3>Meetpunt tussendoor<span class="klein"> (sleuf ' + n + ' blijft doorlopen)</span></h3><div class="chips">' +
+             Object.keys(MPTYPE).map(function (t) { return '<button type="button" class="chip' + (S.mp.t === t ? ' aan' : '') + '" data-mpt="' + t + '">' + MPTYPE[t] + '</button>'; }).join('') +
+             '</div><label class="veld">Waar sta je nu?</label><div class="chips">' +
+             ZIJDEN.map(function (z) { return '<button type="button" class="chip' + (S.mp.z === z ? ' aan' : '') + '" data-mpz="' + z + '">' + z + '</button>'; }).join('') +
+             '</div><button class="groot grijs" id="bMeetpunt" type="button" style="margin-top:10px">Meetpunt hier plaatsen<small>' + MPTYPE[S.mp.t] + ', ' + S.mp.z.toLowerCase() + ' van de weg</small></button></div>' +
+             '<button class="groot" id="bVolgende" type="button">Sleuf ' + n + ' stopt hier, en ik begin sleuf ' + (n + 1) + '<small>het eindpunt van sleuf ' + n + ' is ook het startpunt van sleuf ' + (n + 1) + '</small></button>' +
              '<button class="groot grijs" id="bLaatste" type="button">Sleuf ' + n + ' stopt hier, en dit was de laatste<small>ik ben klaar met opmeten</small></button>';
       } else {
         h += '<button class="groot" id="bNieuw" type="button">Nog een sleuf toevoegen<small>start op het laatste punt (' + letter(n) + ')</small></button>';
@@ -267,8 +307,12 @@
     if ((b = $('bVolgende'))) b.onclick = eindeEnVolgende;
     if ((b = $('bLaatste'))) b.onclick = eindeLaatste;
     if ((b = $('bVerwijder'))) b.onclick = verwijderLaatste;
+    if ((b = $('bMeetpunt'))) b.onclick = meetpuntHier;
   }
   $('acties').addEventListener('click', function (e) {
+    var mt = e.target.closest('button[data-mpt]'), mz = e.target.closest('button[data-mpz]');
+    if (mt) { S.mp.t = mt.dataset.mpt; if (S.mp.t === 'einde') { var lb = S.sleuven.length ? S.sleuven[S.sleuven.length - 1].tussen.filter(function (m) { return m.t === 'begin'; }).pop() : null; if (lb) S.mp.z = andere(lb.z); } bewaar(); renderActies(); return; }
+    if (mz) { S.mp.z = mz.dataset.mpz; bewaar(); renderActies(); return; }
     var el = e.target.closest('button[data-sel]'); if (!el) return;
     S.sel = +el.dataset.sel; bewaar(); renderAlles();
   });
@@ -283,7 +327,14 @@
     var bezig = actief() && i === S.sleuven.length - 1;
     h += '<div class="blok" style="border:3px solid ' + kl(i) + '"><h3 style="font-size:1.2rem"><span style="display:inline-block;background:' + kl(i) + ';color:#fff;border-radius:50%;width:30px;height:30px;line-height:30px;text-align:center;margin-right:8px">' + (i + 1) + '</span>Sleuf ' + (i + 1) + ' <span class="klein">(' + letter(i) + (S.punten.length > i + 1 ? ' tot ' + letter(i + 1) : ' loopt nog') + ')</span>' + (bezig ? '<span class="tag bezig">bezig</span>' : '<span class="tag klaar">afgesloten</span>') + '</h3>';
     h += '<label class="veld">Meters (van het meetwiel)</label><input class="tekst meters" id="fMeters" type="number" inputmode="decimal" step="0.1" min="0" value="' + esc(s.meters) + '" placeholder="0,0">';
-    h += '<label class="veld">Zijde van de straat</label><div class="chips">' + ZIJDEN.map(function (z) { return '<button type="button" class="chip' + (s.zijde === z ? ' aan' : '') + '" data-zijde="' + z + '">' + z + '</button>'; }).join('') + '</div></div>';
+    h += '<label class="veld">Zijde van de straat bij het begin</label><div class="chips">' + ZIJDEN.map(function (z) { return '<button type="button" class="chip' + (s.zijde === z ? ' aan' : '') + '" data-zijde="' + z + '">' + z + '</button>'; }).join('') + '</div>' +
+      '<label class="veld">Zijde bij het einde <span class="klein">(anders dan het begin = doorsteek)</span></label><div class="chips">' + [''].concat(ZIJDEN).map(function (z) { return '<button type="button" class="chip' + ((s.zijdeEinde || '') === z ? ' aan' : '') + '" data-zijdee="' + z + '">' + (z || 'Zelfde') + '</button>'; }).join('') + '</div>';
+    var ds = doorsteken(s);
+    if ((s.tussen || []).length) {
+      h += '<label class="veld">Meetpunten</label>' + s.tussen.map(function (m, j) { return '<div class="mpregel"><span class="t"><b>' + (j + 1) + '.</b> ' + esc(MPTYPE[m.t]) + ' - ' + esc(m.z) + '</span><button type="button" data-delmp="' + j + '">&#10005;</button></div>'; }).join('');
+      if (ds.length) h += '<div class="klein">' + ds.map(function (d, k) { return 'Doorsteek ' + (k + 1) + ': ' + d.van.z + ' &rarr; ' + d.tot.z + ', ca. ' + d.m + ' m (GPS)'; }).join('<br>') + '</div>';
+    }
+    h += '</div>';
 
     h += '<div class="blok">' + vorigeKnop('bovenbouw') + '<h3>Bovenbouw</h3><div class="chips">' + BOVENBOUW.map(function (b) { return '<button type="button" class="chip' + (s.bovenbouw === b ? ' aan' : '') + '" data-bovenbouw="' + esc(b) + '">' + esc(b) + '</button>'; }).join('') + '</div></div>';
 
@@ -314,7 +365,9 @@
     var el = e.target.closest('button'); if (!el) return;
     var s = S.sleuven[S.sel]; if (!s) return;
     var d = el.dataset, vorige = S.sleuven[S.sel - 1];
-    if (d.zijde) s.zijde = d.zijde;
+    if (d.zijde) { s.zijde = d.zijde; syncDoorsteek(s); }
+    else if (d.zijdee !== undefined) { s.zijdeEinde = d.zijdee === s.zijde ? '' : d.zijdee; syncDoorsteek(s); }
+    else if (d.delmp !== undefined) { s.tussen.splice(+d.delmp, 1); }
     else if (d.bovenbouw !== undefined) s.bovenbouw = (s.bovenbouw === d.bovenbouw ? '' : d.bovenbouw);
     else if (d.leiding) { if (s.leidingen[d.leiding]) delete s.leidingen[d.leiding]; else s.leidingen[d.leiding] = 1; }
     else if (d.plus) s.leidingen[d.plus] = (s.leidingen[d.plus] || 0) + 1;
@@ -341,8 +394,8 @@
   // ---------- Overzicht ----------
   function samenvat(s, i) {
     var lei = Object.keys(s.leidingen).map(function (k) { return k.replace('|', ': ') + (s.leidingen[k] > 1 ? ' x' + s.leidingen[k] : ''); });
-    return 'Sleuf ' + (i + 1) + ' (' + letter(i) + (S.punten.length > i + 1 ? '-' + letter(i + 1) : '-') + '): ' + (s.meters || '?') + ' m, ' + s.zijde + ', ' + (s.bovenbouw || 'bovenbouw ?') +
-      (lei.length ? ' | ' + lei.join(', ') : '') + (s.bijz.length ? ' | ' + s.bijz.join(', ') : '') + (s.opm ? ' | ' + s.opm : '');
+    return 'Sleuf ' + (i + 1) + ' (' + letter(i) + (S.punten.length > i + 1 ? '-' + letter(i + 1) : '-') + '): ' + (s.meters || '?') + ' m, ' + s.zijde + (s.zijdeEinde && s.zijdeEinde !== s.zijde ? ' -> ' + s.zijdeEinde : '') + ', ' + (s.bovenbouw || 'bovenbouw ?') +
+      (lei.length ? ' | ' + lei.join(', ') : '') + (s.bijz.length ? ' | ' + s.bijz.join(', ') : '') + (doorsteken(s).length ? ' | ' + doorsteken(s).map(function (d) { return 'doorsteek ' + d.van.z + '->' + d.tot.z + ' ca. ' + d.m + ' m'; }).join(', ') : '') + ((s.tussen || []).length ? ' | meetpunten: ' + s.tussen.map(function (m) { return MPTYPE[m.t] + ' ' + m.z; }).join(', ') : '') + (s.opm ? ' | ' + s.opm : '');
   }
   function rijen() {
     var r = [];
@@ -385,11 +438,11 @@
     else $('melding').textContent = 'Kopiëren wordt niet ondersteund.';
   };
   $('csv').onclick = function () {
-    var regels = [['Werf', 'Sleuf', 'Van', 'Tot', 'Meters', 'Zijde', 'Bovenbouw', 'Leidingen', 'Bijzonderheden', 'Opmerking', 'Lat start', 'Lng start', 'Lat einde', 'Lng einde']];
+    var regels = [['Werf', 'Sleuf', 'Van', 'Tot', 'Meters', 'Zijde begin', 'Zijde einde', 'Bovenbouw', 'Leidingen', 'Bijzonderheden', 'Opmerking', 'Lat start', 'Lng start', 'Lat einde', 'Lng einde', 'Meetpunten (type, zijde, lat, lng)']];
     S.sleuven.forEach(function (s, i) {
       var a = S.punten[i] || ['', ''], b = S.punten[i + 1] || ['', ''];
       var lei = Object.keys(s.leidingen).map(function (k) { return k.replace('|', ': ') + ' x' + s.leidingen[k]; }).join('; ');
-      regels.push([S.werf, kol(i), letter(i), S.punten.length > i + 1 ? letter(i + 1) : '', s.meters, s.zijde, s.bovenbouw, lei, s.bijz.join('; '), s.opm, a[0], a[1], b[0], b[1]]);
+      regels.push([S.werf, kol(i), letter(i), S.punten.length > i + 1 ? letter(i + 1) : '', s.meters, s.zijde, s.zijdeEinde || s.zijde, s.bovenbouw, lei, s.bijz.join('; '), s.opm, a[0], a[1], b[0], b[1], (s.tussen || []).map(function (m) { return MPTYPE[m.t] + ', ' + m.z + ', ' + m.p[0] + ', ' + m.p[1]; }).join(' | ')]);
     });
     var csv = regels.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';'); }).join('\r\n');
     var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
