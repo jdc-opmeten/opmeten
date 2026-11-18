@@ -441,25 +441,37 @@
       })
     };
   }
-  var bezig = false;
-  function toonRij() { var n = wachtrij().length, e = $('verstuurStatus'); if (e) e.textContent = n ? 'In wachtrij: ' + n + ' meting' + (n > 1 ? 'en' : '') + ' (wordt later verstuurd)' : ''; }
+  var bezig = false, STAT = '';
+  function toast(m, fout) {
+    var e = $('toast'); if (!e) { e = document.createElement('div'); e.id = 'toast'; e.style.cssText = 'position:fixed;left:12px;right:12px;bottom:84px;z-index:99999;padding:14px 16px;border-radius:12px;font-size:1rem;font-weight:600;color:#fff;box-shadow:0 4px 18px rgba(0,0,0,.35);text-align:center'; document.body.appendChild(e); }
+    e.style.background = fout ? '#b42318' : '#1f7a43'; e.textContent = m; e.style.display = 'block';
+    clearTimeout(toast.t); toast.t = setTimeout(function () { e.style.display = 'none'; }, 7000);
+    STAT = m; STATF = !!fout; toonRij();
+  }
+  var STATF = false;
+  function toonRij() {
+    var n = wachtrij().length, e = $('verstuurStatus'); if (!e) return;
+    var tekst = STAT || (n ? 'In wachtrij: ' + n + ' meting' + (n > 1 ? 'en' : '') + ' (wordt later verstuurd)' : (S.verzonden ? 'Meting is verstuurd \u2713' : ''));
+    if (STAT && n) tekst += ' (in wachtrij: ' + n + ')';
+    e.textContent = tekst; e.style.fontWeight = tekst ? '700' : ''; e.style.color = STATF ? '#b42318' : (tekst.indexOf('\u2713') >= 0 || /verstuurd naar/.test(tekst) ? '#1f7a43' : '');
+  }
   function stuurRij() {
     if (bezig) return; var r = wachtrij(); if (!r.length) { toonRij(); return; }
     var it = r[0]; if (!it.srv) { toonRij(); return; }
     bezig = true;
-    var ok = function () { var q = wachtrij().filter(function (x) { return x.id !== it.id; }); bewaarRij(q); bezig = false; if (S.mid === it.id) { S.verzonden = Date.now(); bewaar(); } toonRij(); renderActies(); $('melding').textContent = 'Meting verstuurd naar de server.'; if (q.length) stuurRij(); };
-    var fout = function () { bezig = false; toonRij(); };
+    var ok = function () { var q = wachtrij().filter(function (x) { return x.id !== it.id; }); bewaarRij(q); bezig = false; if (S.mid === it.id) { S.verzonden = Date.now(); bewaar(); } STAT = ''; renderActies(); toast('Meting verstuurd naar de server \u2713'); if (q.length) stuurRij(); };
+    var fout = function (why) { bezig = false; toast('Verzenden mislukt' + (why ? ' (' + why + ')' : '') + '. De meting blijft bewaard en wordt later opnieuw verstuurd.', true); };
     try {
-      fetch(it.srv, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: it.body }).then(function (r2) { return r2.text().then(function (tx) { var j = null; try { j = JSON.parse(tx); } catch (e) {} if (r2.ok && !(j && j.ok === false)) ok(); else fout(); }); }).catch(fout);
+      fetch(it.srv, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: it.body }).then(function (r2) { return r2.text().then(function (tx) { var j = null; try { j = JSON.parse(tx); } catch (e) {} if (r2.ok && !(j && j.ok === false)) ok(); else fout(r2.ok ? (j && j.fout) || 'server weigert' : 'server antwoordt ' + r2.status + ', ontvangst nog niet ingesteld'); }); }).catch(function () { fout('geen verbinding'); });
     } catch (e) { fout(); }
   }
   function eindeMeting() {
-    if (!S.sleuven.length) return;
+    if (!S.sleuven.length) { toast('Er is nog niets opgemeten.', true); return; }
     function verstuur() {
       var m = bouwMeting(), r = wachtrij().filter(function (x) { return x.id !== m.meting_id; });
-      if (!SRV) { $('melding').textContent = 'Geen serveradres in de link: de meting blijft enkel op dit toestel. Open de app via het portaal om automatisch te versturen. Je kan intussen het overzicht kopiëren of als CSV bewaren.'; return; }
+      if (!SRV) { toast('Niet verstuurd: er zit geen serveradres in deze link. Open de app opnieuw via "Opmeten in de app" in het portaal (eerst het portaal verversen). De meting blijft op dit toestel bewaard.', true); return; }
       r.push({ id: m.meting_id, srv: SRV, body: JSON.stringify(m) }); bewaarRij(r);
-      S.verzonden = null; bewaar(); toonRij(); $('melding').textContent = 'Meting afgesloten; wordt verstuurd...'; stuurRij();
+      S.verzonden = null; bewaar(); toast('Meting afgesloten, wordt verstuurd...'); stuurRij();
     }
     if (actief()) {
       if (!confirm('Sleuf ' + S.sleuven.length + ' loopt nog. Hier het einde plaatsen en de meting afsluiten?')) return;
@@ -689,6 +701,6 @@
   stuurRij();
 })();
 </script>
-<div class="appver">Opmeten 1.01</div>
+<div class="appver">Opmeten 1.02</div>
 </body>
 </html>
