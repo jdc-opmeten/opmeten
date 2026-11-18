@@ -277,7 +277,7 @@
   function spoorVan(s) { return []; }
   function spoor(g) { return false; }
   // ---------- Zijde van de weg automatisch bepalen (OpenStreetMap-wegen via Overpass) ----------
-  var ROADS = [], ROADC = null, HEAD = null, WEGINFO = '', kand = { z: '', n: 0 };
+  var ROADS = [], ROADC = null, HEAD = null, HEADW = null, WEGINFO = '', kand = { z: '', n: 0 };
   function haalWegen(la, ln) {
     if (ROADC && afstand(ROADC, [la, ln]) < 50) return;
     ROADC = [la, ln];
@@ -298,7 +298,9 @@
     if (!best || best.d > 40) return null;
     var Ln = Math.sqrt(best.dx * best.dx + best.dy * best.dy); if (!Ln) return null;
     var ux = best.dx / Ln, uy = best.dy / Ln, hr = HEAD.h * Math.PI / 180, vx = Math.sin(hr), vy = Math.cos(hr), dot = ux * vx + uy * vy;
-    if (Math.abs(dot) < 0.5) return null;   // je loopt dwars op de weg
+    if (Math.abs(dot) >= 0.5) HEADW = HEAD.h;   // looprichting langs de weg onthouden
+    else if (HEADW != null) { hr = HEADW * Math.PI / 180; vx = Math.sin(hr); vy = Math.cos(hr); dot = ux * vx + uy * vy; if (Math.abs(dot) < 0.5) return null; }   // dwars oversteken: de laatste looprichting langs de weg blijft gelden
+    else return null;
     if (dot < 0) { ux = -ux; uy = -uy; }
     var wx = -best.cx, wy = -best.cy, cr = ux * wy - uy * wx;   // positief: je staat links van de weg (in je looprichting)
     return { z: cr > 0 ? 'Links' : 'Rechts', d: Math.abs(cr), naam: best.naam };
