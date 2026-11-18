@@ -58,6 +58,25 @@
   .tag.bezig { background: #dcf3e4; color: #1f7a3f; }
   .tag.klaar { background: #eef0f4; color: #5b6478; }
   .verborgen { display: none; }
+  .nav { display: flex; gap: 8px; align-items: stretch; margin: 0; }
+  .nav button.pijl { flex: none; width: 52px; border: 1px solid #c8ced9; background: #fff; border-radius: 12px; font-size: 1.6rem; color: #1d2330; }
+  .nav button.pijl:disabled { opacity: .3; }
+  .nav .mid { flex: 1; border: 3px solid #1f7a3f; border-radius: 14px; background: #fff; padding: 8px 10px; display: flex; align-items: center; gap: 10px; text-align: left; font: inherit; color: inherit; }
+  .nav .mid .badge { flex: none; width: 38px; height: 38px; border-radius: 50%; color: #fff; font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .nav .mid b { display: block; font-size: 1.05rem; }
+  .nav .mid span.t { display: block; font-size: .78rem; color: #4a5266; }
+  .twee { display: flex; gap: 8px; }
+  .twee > button { flex: 1; }
+  .twee .groot { padding: 13px 8px; font-size: .98rem; }
+  .zij { display: flex; gap: 6px; align-items: center; }
+  .zij .lbl { font-size: .85rem; color: #6b7384; margin-right: 2px; }
+  .zij .chip { flex: 1; padding: 8px 4px; text-align: center; }
+  .mrij { display: flex; gap: 8px; align-items: center; }
+  .mrij label { font-weight: 600; font-size: .9rem; white-space: nowrap; }
+  .mrij input { flex: 1; font-size: 1.3rem; padding: 8px; text-align: center; border: 1px solid #c8ced9; border-radius: 8px; min-width: 0; }
+  .wislink { background: none; border: 0; color: #b42318; font-size: .85rem; padding: 6px; }
+  #kompas { position: absolute; z-index: 800; right: 10px; top: 10px; width: 42px; height: 42px; border-radius: 50%; border: 1px solid #c8ced9; background: #fff; font-size: 1.1rem; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+  #mapwrap { position: relative; }
   .letter { background: #1d2330; color: #fff; border-radius: 50%; width: 22px; height: 22px; line-height: 22px; text-align: center; font-weight: 700; font-size: .75rem; border: 2px solid #fff; }
   .sleuflabel { background: #fff; border: 1px solid #1d2330; border-radius: 6px; padding: 1px 5px; font-weight: 600; font-size: .75rem; }
 .mp { background: #fff; border: 2px solid #b42318; color: #b42318; border-radius: 50%; width: 18px; height: 18px; line-height: 14px; text-align: center; font-weight: 700; font-size: .65rem; }
@@ -79,7 +98,7 @@
 </header>
 
 <section id="vOpmeten">
-  <div id="map"></div>
+  <div id="mapwrap"><div id="map"></div><button id="kompas" type="button" title="Kaart draait mee met je looprichting">&#129517;</button></div>
   <div id="gps">GPS: nog geen positie</div>
   <div class="knoppen" id="acties"></div>
   <div id="formulier"></div>
@@ -101,6 +120,7 @@
 </section>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="leaflet-rotate.js"></script>
 <script>
 (function () {
   'use strict';
@@ -161,7 +181,7 @@
   }
 
   // ---------- Kaart ----------
-  var kaart = L.map('map', { zoomControl: true }).setView([51.158, 4.445], 16);
+  var kaart = L.map('map', { zoomControl: true, rotate: true, bearing: 0, touchRotate: false, rotateControl: false }).setView([51.158, 4.445], 16);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -250,6 +270,7 @@
   function zetPos(p) {
     laatstePos = { lat: p.coords.latitude, lng: p.coords.longitude, nauw: p.coords.accuracy, t: Date.now() };
     BUF.push(laatstePos);
+    if (p.coords.heading != null && !isNaN(p.coords.heading) && (p.coords.speed || 0) > 0.7) draai(p.coords.heading);
     var gp = glad() || [laatstePos.lat, laatstePos.lng], nieuwSpoor = spoor(gp);
     $('gps').textContent = 'GPS: nauwkeurigheid ongeveer ' + Math.round(laatstePos.nauw) + ' m';
     if (!mijn) { mijn = L.circleMarker([laatstePos.lat, laatstePos.lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#1a73e8', fillOpacity: 1 }).addTo(kaart); nauwk = L.circle([laatstePos.lat, laatstePos.lng], { radius: laatstePos.nauw, color: '#1a73e8', weight: 1, fillOpacity: .1 }).addTo(kaart); if (!S.punten.length) kaart.setView([laatstePos.lat, laatstePos.lng], 18); }
@@ -257,6 +278,20 @@
     if (nieuwSpoor || (S.sleuven.length && actief() && !liveLijn)) tekenKaart(false);
     else if (liveLijn && S.punten.length) liveLijn.setLatLngs([laatstePunt(), [laatstePos.lat, laatstePos.lng]]);
   }
+  // Kaart draait mee met je looprichting (GPS-richting zodra je beweegt); knop rechtsboven zet dit aan of uit
+  var DRAAI = true, richting = null;
+  function draai(h) {
+    if (!kaart.setBearing) return;
+    if (!DRAAI) { kaart.setBearing(0); return; }
+    if (h == null) return;
+    richting = richting == null ? h : (function () { var d = ((h - richting + 540) % 360) - 180; return (richting + d * 0.35 + 360) % 360; })();
+    kaart.setBearing(360 - richting);
+  }
+  $('kompas').onclick = function () {
+    DRAAI = !DRAAI; this.style.opacity = DRAAI ? 1 : .5; this.title = DRAAI ? 'Kaart draait mee met je looprichting' : 'Kaart staat vast met het noorden boven';
+    if (!DRAAI) { kaart.setBearing && kaart.setBearing(0); } else if (richting != null) draai(richting);
+    $('melding').textContent = DRAAI ? 'Kaart draait mee met je looprichting.' : 'Kaart staat vast: noorden boven.';
+  };
   if ('geolocation' in navigator) {
     navigator.geolocation.watchPosition(zetPos, function (e) { $('gps').textContent = 'GPS niet beschikbaar: ' + (e.message || e.code); }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 30000 });
   } else { $('gps').textContent = 'Geen GPS-ondersteuning in deze browser.'; }
@@ -334,31 +369,22 @@
       h = '<div class="status" style="border-color:#8a93a6"><div><b>Nog niet begonnen</b><span class="t">Ga op het beginpunt van de eerste sleuf staan en tik hieronder.</span></div></div>' +
           '<button class="groot" id="bStart" type="button">Start sleuf 1 hier<small>dit wordt punt A</small></button>';
     } else {
-      var act = actief(), k = kl(n - 1);
-      h = '<div class="status" style="border-color:' + k + '"><span class="badge" style="background:' + k + '">' + n + '</span><div>' +
-          (act ? '<b>Je meet nu: sleuf ' + n + '</b><span class="t">Gestart in punt ' + letter(n - 1) + '. Loop tot het einde van deze sleuf en tik dan hieronder.</span>'
-               : '<b>Sleuf ' + n + ' is afgesloten</b><span class="t">Je kan nog een sleuf toevoegen. Ben je klaar, dan hoef je niets meer te doen.</span>') +
-          '</div></div>';
-      if (n > 1) {
-        h += '<div class="kies"><span class="lbl">Gegevens invullen van:</span>' + S.sleuven.map(function (x, i) {
-          var c = kl(i), aan = i === S.sel;
-          return '<button type="button" data-sel="' + i + '" class="' + (aan ? 'aan' : '') + '" style="border-color:' + c + ';' + (aan ? 'background:' + c : 'color:' + c) + '">Sleuf ' + (i + 1) + (act && i === n - 1 ? ' ●' : '') + '</button>';
-        }).join('') + '</div>';
-      }
+      var act = actief(), sel = (S.sel >= 0 && S.sel < n) ? S.sel : n - 1, k = kl(sel), s = S.sleuven[sel];
+      h = '<div class="nav"><button type="button" class="pijl" data-nav="-1"' + (sel <= 0 ? ' disabled' : '') + '>&lsaquo;</button>' +
+          '<button type="button" class="mid" id="navMid" style="border-color:' + k + '"><span class="badge" style="background:' + k + '">' + (sel + 1) + '</span><div><b>Sleuf ' + (sel + 1) + ' van ' + n + '</b><span class="t">' +
+          (sel === n - 1 ? (act ? 'loopt nog &middot; tik om gegevens te wijzigen' : 'afgesloten &middot; tik om gegevens te wijzigen') : 'afgesloten &middot; tik om gegevens te wijzigen') + '</span></div></button>' +
+          '<button type="button" class="pijl" data-nav="1"' + (sel >= n - 1 ? ' disabled' : '') + '>&rsaquo;</button></div>';
+      h += '<div class="mrij"><label for="qMeters">Meters sleuf ' + (sel + 1) + '</label><input id="qMeters" type="number" inputmode="decimal" step="0.1" min="0" value="' + esc(s.meters) + '" placeholder="meetwiel"></div>';
       if (act) {
         var open = S.mp.t === 'einde';
-        h += '<div class="blok" style="margin:0"><h3>Onderweg<span class="klein"> (de lijn verbindt de punten die je zelf plaatst)</span></h3>' +
-             (open ? '<button class="groot" id="bEinde" type="button" style="background:#b35c00">Einde doorsteek hier<small>' + S.mp.z.toLowerCase() + ' van de weg</small></button>'
-                   : '<div class="chips"><button type="button" class="chip" id="bBegin" style="flex:1">&harr; Begin doorsteek</button><button type="button" class="chip" id="bPunt" style="flex:1">&bull; Meetpunt</button></div>') +
-             '<label class="veld">Waar sta je nu?</label><div class="chips">' +
-             ZIJDEN.map(function (z) { return '<button type="button" class="chip' + (S.mp.z === z ? ' aan' : '') + '" data-mpz="' + z + '">' + z + '</button>'; }).join('') +
-             '</div></div>' +
-             '<button class="groot" id="bVolgende" type="button">Sleuf ' + n + ' stopt hier, en ik begin sleuf ' + (n + 1) + '<small>het eindpunt van sleuf ' + n + ' is ook het startpunt van sleuf ' + (n + 1) + '</small></button>' +
-             '<button class="groot grijs" id="bLaatste" type="button">Sleuf ' + n + ' stopt hier, en dit was de laatste<small>ik ben klaar met opmeten</small></button>';
+        h += (open ? '<button class="groot" id="bEinde" type="button" style="background:#b35c00">Einde doorsteek hier<small>' + S.mp.z.toLowerCase() + ' van de weg</small></button>'
+                   : '<div class="twee"><button class="groot grijs" id="bPunt" type="button">&bull; Meetpunt</button><button class="groot grijs" id="bBegin" type="button">&harr; Begin doorsteek</button></div>') +
+             '<div class="zij"><span class="lbl">Waar:</span>' + ZIJDEN.map(function (z) { return '<button type="button" class="chip' + (S.mp.z === z ? ' aan' : '') + '" data-mpz="' + z + '">' + z + '</button>'; }).join('') + '</div>' +
+             '<div class="twee"><button class="groot" id="bVolgende" type="button">Stopt hier &rarr; sleuf ' + (n + 1) + '</button><button class="groot grijs" id="bLaatste" type="button">Stopt hier, klaar</button></div>';
       } else {
         h += '<button class="groot" id="bNieuw" type="button">Nog een sleuf toevoegen<small>start op het laatste punt (' + letter(n) + ')</small></button>';
       }
-      h += '<button class="wis" id="bVerwijder" type="button">Sleuf ' + n + ' wissen (de laatste)</button>';
+      h += '<div style="text-align:center"><button class="wislink" id="bVerwijder" type="button">Laatste sleuf (' + n + ') wissen</button></div>';
     }
     $('acties').innerHTML = h;
     var b;
@@ -370,11 +396,14 @@
     if ((b = $('bBegin'))) b.onclick = function () { S.mp.t = 'begin'; meetpuntHier(); };
     if ((b = $('bPunt'))) b.onclick = function () { S.mp.t = 'punt'; meetpuntHier(); };
     if ((b = $('bEinde'))) b.onclick = function () { S.mp.t = 'einde'; meetpuntHier(); };
+    if ((b = $('navMid'))) b.onclick = function () { var f = $('formulier'); if (f) f.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   }
   $('acties').addEventListener('click', function (e) {
     var mt = e.target.closest('button[data-mpt]'), mz = e.target.closest('button[data-mpz]');
     if (mt) { S.mp.t = mt.dataset.mpt; if (S.mp.t === 'einde') { var lb = S.sleuven.length ? S.sleuven[S.sleuven.length - 1].tussen.filter(function (m) { return m.t === 'begin'; }).pop() : null; if (lb) S.mp.z = andere(lb.z); } bewaar(); renderActies(); return; }
     if (mz) { S.mp.z = mz.dataset.mpz; bewaar(); renderActies(); return; }
+    var nv = e.target.closest('button[data-nav]');
+    if (nv) { var t2 = Math.max(0, Math.min(S.sleuven.length - 1, (S.sel < 0 ? S.sleuven.length - 1 : S.sel) + (+nv.dataset.nav))); S.sel = t2; bewaar(); renderAlles(); return; }
     var el = e.target.closest('button[data-sel]'); if (!el) return;
     S.sel = +el.dataset.sel; bewaar(); renderAlles();
   });
@@ -388,7 +417,6 @@
     var vorigeKnop = function (wat) { return heeftVorige ? '<button class="vorige" type="button" data-vorige="' + wat + '">Zoals vorige</button>' : ''; };
     var bezig = actief() && i === S.sleuven.length - 1;
     h += '<div class="blok" style="border:3px solid ' + kl(i) + '"><h3 style="font-size:1.2rem"><span style="display:inline-block;background:' + kl(i) + ';color:#fff;border-radius:50%;width:30px;height:30px;line-height:30px;text-align:center;margin-right:8px">' + (i + 1) + '</span>Sleuf ' + (i + 1) + ' <span class="klein">(' + letter(i) + (S.punten.length > i + 1 ? ' tot ' + letter(i + 1) : ' loopt nog') + ')</span>' + (bezig ? '<span class="tag bezig">bezig</span>' : '<span class="tag klaar">afgesloten</span>') + '</h3>';
-    h += '<label class="veld">Meters (van het meetwiel)</label><input class="tekst meters" id="fMeters" type="number" inputmode="decimal" step="0.1" min="0" value="' + esc(s.meters) + '" placeholder="0,0">';
     h += '<label class="veld">Zijde van de straat bij het begin</label><div class="chips">' + ZIJDEN.map(function (z) { return '<button type="button" class="chip' + (s.zijde === z ? ' aan' : '') + '" data-zijde="' + z + '">' + z + '</button>'; }).join('') + '</div>' +
       '<label class="veld">Zijde bij het einde <span class="klein">(anders dan het begin = doorsteek)</span></label><div class="chips">' + [''].concat(ZIJDEN).map(function (z) { return '<button type="button" class="chip' + ((s.zijdeEinde || '') === z ? ' aan' : '') + '" data-zijdee="' + z + '">' + (z || 'Zelfde') + '</button>'; }).join('') + '</div>';
     var ds = doorsteken(s);
@@ -453,8 +481,12 @@
     } else return;
     bewaar(); renderFormulier(); tekenKaart(false); renderActies();
   });
+  $('acties').addEventListener('input', function (e) {
+    if (e.target.id === 'qMeters') { var sq = S.sleuven[S.sel >= 0 ? S.sel : S.sleuven.length - 1]; if (sq) { sq.meters = e.target.value; bewaar(); tekenKaart(false); } }
+  });
   $('formulier').addEventListener('input', function (e) {
     var s = S.sleuven[S.sel]; if (!s) return;
+    if (e.target.id === 'qMeters') { var sq = S.sleuven[S.sel >= 0 ? S.sel : S.sleuven.length - 1]; if (sq) { sq.meters = e.target.value; bewaar(); tekenKaart(false); } }
     if (e.target.id === 'fMeters') { s.meters = e.target.value; bewaar(); tekenKaart(false); }
     if (e.target.id === 'fOpm') { s.opm = e.target.value; bewaar(); }
   });
